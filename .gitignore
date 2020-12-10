@@ -1,0 +1,5 @@
+dev.env
+prod.env
+build/
+minio/
+/*.xml

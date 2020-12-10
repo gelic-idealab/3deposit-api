@@ -1,0 +1,22 @@
+version: '3'
+
+services:
+
+  api:
+    container_name: 3deposit-api
+    build: .
+    image: 3deposit-api:latest
+    restart: always
+    env_file:
+      - prod.env
+    labels:
+      - "traefik.frontend.rule=Host:api.3deposit.library.illinois.edu"
+      - "traefik.backend=3deposit-api"
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true

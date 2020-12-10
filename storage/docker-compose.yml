@@ -1,0 +1,39 @@
+version: '3'
+
+services:
+
+    db:
+        container_name: 3deposit-db
+        image: mysql:5.7
+        ports:
+            - 3306:3306
+        restart: always
+        env_file:
+            - ../prod.env
+        volumes:
+            - ../sql:/docker-entrypoint-initdb.d
+        networks:
+            - proxy
+        
+    minio:
+        container_name: 3deposit-minio
+        image: minio/minio:latest
+        ports:
+            - 9000:9000
+        labels:
+            - "traefik.frontend.rule=Host:files.3deposit.library.illinois.edu"
+            - "traefik.backend=3deposit-minio"
+            - "traefik.enable=true"
+            - "traefik.docker.network=proxy"
+        volumes:
+            - ./minio/data:/data
+        env_file:
+            - ../prod.env
+        command: server /data
+        restart: always
+        networks:
+            - proxy
+
+networks:
+    proxy:
+        external: true
