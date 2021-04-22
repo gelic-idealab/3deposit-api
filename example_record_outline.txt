@@ -8,7 +8,7 @@ Example: RBML, artefacts
            - Props, Costume pieces Box 38
            - application provenance metadata (aggregated from changes to specific slices/scopes/files)
                - [Entity] Haripiece 1
-               - descriptive metadata for specific slice
+               - descriptive metadata for specific item group
                     - [File] files have workflow-scope (which folder is it in): 
                         - [Scope - 3deposit-specific designation] Scope
                             [ie. "Pre-process", "Post-process", "Export"]

@@ -40,6 +40,48 @@ CREATE TABLE `deposits` (
     FOREIGN KEY (upload_by) REFERENCES users(id)
 );
 
+CREATE TABLE 'organizations' (
+    `id` varchar NOT NULL,
+    `name` varchar NOT NULL,
+    `desc` text NOT NULL
+);
+
+CREATE TABLE 'collections' (
+    `id` varchar NOT NULL,
+    `name` varchar NOT NULL,
+    `desc` text NOT NULL,
+    `org_id` varchar DEFAULT NULL,
+    PRIMARY KEY (id),
+    FOREIGN KEY (org_id) REFERENCES organizations(id),
+);
+
+CREATE TABLE 'items' (
+    `id` varchar NOT NULL,
+    `name` varchar NOT NULL,
+    `desc` text NOT NULL,
+    `collection_id` varchar DEFAULT NULL,
+    PRIMARY KEY (id),
+    FOREIGN KEY (collection_id) REFERENCES collections(id),
+);
+
+CREATE TABLE 'entities' (
+    `id` varchar NOT NULL,
+    `name` varchar NOT NULL,
+    `desc` text NOT NULL,
+    `item_id` varchar DEFAULT NULL,
+    PRIMARY KEY (id),
+    FOREIGN KEY (item_id) REFERENCES items(id),
+);
+
+CREATE TABLE 'files' (
+    `id` varchar NOT NULL,
+    `name` varchar NOT NULL,
+    `desc` text NOT NULL,
+    `entity_id` varchar DEFAULT NULL,
+    PRIMARY KEY (id),
+    FOREIGN KEY (entity_id) REFERENCES entities(id),
+);
+
 CREATE TABLE `tokens` (
     `id` int NOT NULL AUTO_INCREMENT,
     `token` varchar(128) NOT NULL,
