@@ -268,7 +268,7 @@ func initAdmin() {
 	_, err = db.Exec(`INSERT INTO users (email, password, role_id, first_name, last_name) VALUES (?, ?, ?, ?, ?);`, adminEmail, hashedAndSalted, 1, "3deposit", "Admin")
 	if err != nil {
 		log.Println(err)
-		return
+		log.Fatalln("Unable to create default user. Exiting.")
 	}
 	log.Println("Admin user created successfully: " + adminEmail)
 }

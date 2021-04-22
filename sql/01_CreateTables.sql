@@ -25,61 +25,56 @@ CREATE TABLE `deposit_types` (
     PRIMARY KEY (id)
 );
 
-CREATE TABLE `deposits` (
-    `id` varchar(50) NOT NULL,
-    `name` varchar(50) NOT NULL,
-    `desc` varchar(250) NOT NULL,
-    `created` timestamp,
-    `updated` timestamp NOT NULL,
-    `type_id` int NOT NULL,
-    `size` bigint NOT NULL,
-    `upload_by` int NOT NULL,
-    UNIQUE (id),
-    PRIMARY KEY (id),
-    FOREIGN KEY (type_id) REFERENCES deposit_types(id),
-    FOREIGN KEY (upload_by) REFERENCES users(id)
+-- CREATE TABLE `deposits` (
+--     `id` varchar(50) NOT NULL,
+--     `name` varchar(50) NOT NULL,
+--     `desc` varchar(250) NOT NULL,
+--     `created` timestamp,
+--     `updated` timestamp,
+--     `type_id` int NOT NULL,
+--     `size` bigint NOT NULL,
+--     `upload_by` int NOT NULL,
+--     UNIQUE (id),
+--     PRIMARY KEY (id)
+-- );
+
+CREATE TABLE `organizations` (
+    `id` int NOT NULL AUTO_INCREMENT,
+    `name` varchar(256) NOT NULL,
+    `desc` varchar(4096) NOT NULL,
+    PRIMARY KEY (id)
 );
 
-CREATE TABLE 'organizations' (
-    `id` varchar NOT NULL,
-    `name` varchar NOT NULL,
-    `desc` text NOT NULL
+CREATE TABLE `collections` (
+    `id` int NOT NULL AUTO_INCREMENT,
+    `name` varchar(256) NOT NULL,
+    `desc` varchar(4096) NOT NULL,
+    `org_id` int DEFAULT NULL,
+    PRIMARY KEY (id)
 );
 
-CREATE TABLE 'collections' (
-    `id` varchar NOT NULL,
-    `name` varchar NOT NULL,
-    `desc` text NOT NULL,
-    `org_id` varchar DEFAULT NULL,
-    PRIMARY KEY (id),
-    FOREIGN KEY (org_id) REFERENCES organizations(id),
+CREATE TABLE `items` (
+    `id` int NOT NULL AUTO_INCREMENT,
+    `name` varchar(256) NOT NULL,
+    `desc` varchar(4096) NOT NULL,
+    `collection_id` int DEFAULT NULL,
+    PRIMARY KEY (id)
 );
 
-CREATE TABLE 'items' (
-    `id` varchar NOT NULL,
-    `name` varchar NOT NULL,
-    `desc` text NOT NULL,
-    `collection_id` varchar DEFAULT NULL,
-    PRIMARY KEY (id),
-    FOREIGN KEY (collection_id) REFERENCES collections(id),
+CREATE TABLE `entities` (
+    `id` int NOT NULL AUTO_INCREMENT,
+    `name` varchar(256) NOT NULL,
+    `desc` varchar(256) NOT NULL,
+    `item_id` int DEFAULT NULL,
+    PRIMARY KEY (id)
 );
 
-CREATE TABLE 'entities' (
-    `id` varchar NOT NULL,
-    `name` varchar NOT NULL,
-    `desc` text NOT NULL,
-    `item_id` varchar DEFAULT NULL,
-    PRIMARY KEY (id),
-    FOREIGN KEY (item_id) REFERENCES items(id),
-);
-
-CREATE TABLE 'files' (
-    `id` varchar NOT NULL,
-    `name` varchar NOT NULL,
-    `desc` text NOT NULL,
-    `entity_id` varchar DEFAULT NULL,
-    PRIMARY KEY (id),
-    FOREIGN KEY (entity_id) REFERENCES entities(id),
+CREATE TABLE `files` (
+    `id` int NOT NULL AUTO_INCREMENT,
+    `name` varchar(256) NOT NULL,
+    `desc` varchar(4096) NOT NULL,
+    `entity_id` int DEFAULT NULL,
+    PRIMARY KEY (id)
 );
 
 CREATE TABLE `tokens` (
@@ -99,9 +94,7 @@ CREATE TABLE `events` (
     `event_target` int NOT NULL,
     `event_type` varchar(128) NOT NULL,
     `event_timestamp` timestamp NOT NULL,
-    PRIMARY KEY (id),
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (deposit_id) REFERENCES deposits(id)
+    PRIMARY KEY (id)
 );
 
 CREATE TABLE `metadata_fields` (
@@ -122,17 +115,14 @@ CREATE TABLE `metadata_values` (
     `file_id` varchar(50),
     `metadata_id` int NOT NULL,
     `value` varchar(4096),
-    `updated` timestamp NOT NULL,
-    `updated_by` int NOT NULL,
-    PRIMARY KEY (id),
-    FOREIGN KEY (metadata_id) REFERENCES metadata_fields(id),
-    FOREIGN KEY (updated_by) REFERENCES users(id)
+    `updated` timestamp,
+    `updated_by` int,
+    PRIMARY KEY (id)
 );
 
 CREATE TABLE `metadata_vocab` (
     `id` int NOT NULL AUTO_INCREMENT,
     `field_id` int NOT NULL,
     `vocab_item` varchar(256),
-    PRIMARY KEY (id),
-    FOREIGN KEY (field_id) REFERENCES metadata_fields(id)
+    PRIMARY KEY (id)
 );
