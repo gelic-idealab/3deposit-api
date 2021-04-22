@@ -1,0 +1,20 @@
+How to structure a scan collection:
+Example: RBML, artefacts
+   [Organization] RBML
+    [Collection] General Realia, Costume, Winston Churchill
+        - descriptive metadata for collection level
+        - [Item] Hairpiece 
+           - Lieber 7 Props, Costume Pieces Box 37, OVERSIZE
+           - Props, Costume pieces Box 38
+           - application provenance metadata (aggregated from changes to specific slices/scopes/files)
+               - [Entity] Haripiece 1
+               - descriptive metadata for specific slice
+                    - [File] files have workflow-scope (which folder is it in): 
+                        - [Scope - 3deposit-specific designation] Scope
+                            [ie. "Pre-process", "Post-process", "Export"]
+                        - pre-process raw files
+                            - who was the scanner?
+                            - 3deposit-specific metadata
+                        - post-process files 
+                        - export models 
+                        - extracted/generated technical metadata

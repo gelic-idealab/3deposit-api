@@ -62,6 +62,46 @@ type Dashboard struct {
 	VR     int   `json:"vr"`
 }
 
+// Top-level grouping for all collections, items, entities, and files
+type Organization struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Desc string `json:"desc"`
+}
+
+// Grouping for all items, entities, and files
+type Collection struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Desc string `json:"desc"`
+	// Metadata []Metadata `json:"metadata"`
+}
+
+// Grouping for all entities and files
+type Item struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Desc string `json:"desc"`
+	// Metadata []Metadata `json:"metadata"`
+}
+
+// Grouping for all sub-item entities
+type Entity struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Desc string `json:"desc"`
+	// Metadata []Metadata `json:"metadata"`
+}
+
+// Literal file records
+type File struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Desc  string `json:"desc"`
+	Scope string `json:"scope"`
+	// Metadata []Metadata `json:"metadata"`
+}
+
 // Deposit data representation of deposit values in db
 type Deposit struct {
 	ID       string          `json:"id"`
@@ -231,7 +271,6 @@ func initAdmin() {
 		return
 	}
 	log.Println("Admin user created successfully: " + adminEmail)
-	return
 }
 
 func initMinio() {
@@ -562,11 +601,11 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 			depositSize += size
 
 			file, err := files[i].Open()
-			defer file.Close()
 			if err != nil {
 				fmt.Fprintln(w, err)
 				return
 			}
+			defer file.Close()
 
 			// put object into default bucket
 			info, err := minioClient.PutObject(context.Background(), defaultBucketName, depositID+"/"+filename, file, size, minio.PutObjectOptions{})
@@ -641,7 +680,6 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	// unhandled method
 	fmt.Fprintln(w, "No handler for method:", r.Method)
-	return
 
 }
 
@@ -906,7 +944,6 @@ func depositsHandler(w http.ResponseWriter, r *http.Request) {
 
 	// unhandled method
 	fmt.Fprintln(w, "No handler for method:", r.Method)
-	return
 }
 
 func downloadHandler(w http.ResponseWriter, r *http.Request) {
@@ -1333,7 +1370,6 @@ func depositMetadataHandler(w http.ResponseWriter, r *http.Request) {
 
 	// No handled method.
 	fmt.Fprintf(w, "Method not supported.")
-	return
 }
 
 func depositFileHandler(w http.ResponseWriter, r *http.Request) {
@@ -1386,11 +1422,11 @@ func depositFileHandler(w http.ResponseWriter, r *http.Request) {
 			size := files[i].Size
 
 			file, err := files[i].Open()
-			defer file.Close()
 			if err != nil {
 				fmt.Fprintln(w, err)
 				return
 			}
+			defer file.Close()
 
 			// put object into default bucket
 			info, err := minioClient.PutObject(context.Background(), defaultBucketName, depositID+"/"+filename, file, size, minio.PutObjectOptions{})
