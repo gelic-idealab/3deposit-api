@@ -1254,6 +1254,19 @@ func orgsHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Organization data saved successfully: "+name)
 		return
 	}
+
+	if r.Method == "DELETE" {
+		id := r.URL.Query().Get("id")
+		_, err = db.Exec(`DELETE FROM organizations WHERE id = ?`, id)
+		if err != nil {
+			log.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, "Database error.")
+			return
+		}
+		fmt.Fprintf(w, "Org deleted successfully: "+id)
+		return
+	}
 }
 
 func metadataHandler(w http.ResponseWriter, r *http.Request) {
