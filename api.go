@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -63,10 +64,11 @@ type Dashboard struct {
 }
 
 // Top-level grouping for all collections, items, entities, and files
-type Organization struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	Desc string `json:"desc"`
+type Org struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Desc   string `json:"desc"`
+	Owners []User `json:"owners"`
 }
 
 // Grouping for all items, entities, and files
@@ -1121,6 +1123,137 @@ func usersHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func orgsHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println(r.Method, r.RequestURI, r.RemoteAddr)
+	w.Header().Set("Access-Control-Allow-Origin", origin)
+	w.Header().Set("Access-Control-Allow-Headers", "X-API-KEY")
+	w.Header().Set("Access-Control-Allow-Methods", "DELETE")
+
+	if r.Method == "OPTIONS" {
+		return
+	}
+
+	token := r.Header.Get("X-API-KEY")
+	user, err := userHasPermissions(token, userRoleAdmin)
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, "Database error.")
+	}
+	if user.RoleID == 0 {
+		w.WriteHeader(http.StatusUnauthorized)
+		fmt.Fprint(w, "User not permitted.")
+		return
+	}
+
+	if r.Method == "GET" {
+		rows, err := db.Query(`SELECT o.id, o.name, o.desc FROM organizations o;`)
+		if err != nil {
+			log.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, "Database error.")
+			return
+		}
+		orgs := []Org{}
+		for rows.Next() {
+			org := Org{}
+			err := rows.Scan(&org.ID, &org.Name, &org.Desc)
+			if err != nil {
+				log.Println(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			org.Owners = []User{} // init with empty array; json serialization will be null otherwise.
+
+			// Get org owners.
+			owners, err := db.Query(`SELECT DISTINCT u.id, u.email FROM users u JOIN owners o ON u.id = o.owner_id WHERE o.scope = "organization" AND o.ref_id = ?;`, org.ID)
+			if err != nil {
+				log.Println(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprint(w, "Error getting organization owners.")
+				return
+			}
+			for owners.Next() {
+				owner := User{}
+				err := owners.Scan(&owner.ID, &owner.Email)
+				if err != nil {
+					log.Println(err)
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				org.Owners = append(org.Owners, owner)
+			}
+			orgs = append(orgs, org)
+		}
+		// construct users data payload
+		orgsJSON, err := json.Marshal(orgs)
+		if err != nil {
+			log.Println("Error encoding users data", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		fmt.Fprint(w, string(orgsJSON))
+		return
+	}
+
+	if r.Method == "POST" {
+		err := r.ParseMultipartForm(10 << maxUploadSizeMB) // maxUploadSizeMB will be held in memory, the rest of the form data will go to disk.
+		if err != nil {
+			log.Println(err)
+			fmt.Fprintln(w, err)
+			return
+		}
+
+		id, _ := strconv.ParseInt(r.FormValue("id"), 10, 64)
+		name := r.FormValue("name")
+		desc := r.FormValue("desc")
+		owners := r.FormValue("owners")
+
+		if id != 0 {
+			// update existing org record
+			log.Println("Update org data for:", name)
+			_, err = db.Exec(`UPDATE organizations o SET o.name=?, o.desc=? WHERE id=?;`, name, desc, id)
+			if err != nil {
+				log.Println(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprint(w, "Error updating organization data.")
+				return
+			}
+		} else {
+			// write new db record
+			result, err := db.Exec("INSERT INTO organizations (name, `desc`) VALUES (?, ?);", name, desc)
+			if err != nil {
+				log.Println(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprint(w, "Database error.")
+				return
+			}
+			id, err = result.LastInsertId()
+			if err != nil {
+				log.Println(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprint(w, "Error assigning owner to organization.")
+			}
+		}
+
+		// update org owners
+		ownerIds := strings.Replace(owners, ",", " ", -1)
+		ownersSlice := strings.Fields(ownerIds)
+		for i := range ownersSlice {
+			_, err := db.Exec("INSERT IGNORE INTO owners (scope, ref_id, owner_id) VALUES (?, ?, ?);", "organization", id, ownersSlice[i])
+			if err != nil {
+				log.Println(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprint(w, "Database error.")
+				return
+			}
+		}
+
+		fmt.Fprintf(w, "Organization data saved successfully: "+name)
+		return
+	}
+}
+
 func metadataHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println(r.Method, r.RequestURI, r.RemoteAddr)
 	w.Header().Set("Access-Control-Allow-Origin", origin)
@@ -1498,6 +1631,7 @@ func main() {
 	http.HandleFunc("/metadata", metadataHandler)
 	http.HandleFunc("/upload", uploadHandler)
 	http.HandleFunc("/users", usersHandler)
+	http.HandleFunc("/orgs", orgsHandler)
 
 	// serve
 	log.Println("Serving on :8081")
