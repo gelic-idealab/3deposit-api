@@ -1240,12 +1240,14 @@ func orgsHandler(w http.ResponseWriter, r *http.Request) {
 		ownerIds := strings.Replace(owners, ",", " ", -1)
 		ownersSlice := strings.Fields(ownerIds)
 		for i := range ownersSlice {
-			_, err := db.Exec("INSERT IGNORE INTO owners (scope, ref_id, owner_id) VALUES (?, ?, ?);", "organization", id, ownersSlice[i])
-			if err != nil {
-				log.Println(err)
-				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Fprint(w, "Database error.")
-				return
+			if ownersSlice[i] != "0" {
+				_, err := db.Exec("INSERT IGNORE INTO owners (scope, ref_id, owner_id) VALUES (?, ?, ?);", "organization", id, ownersSlice[i])
+				if err != nil {
+					log.Println(err)
+					w.WriteHeader(http.StatusInternalServerError)
+					fmt.Fprint(w, "Database error.")
+					return
+				}
 			}
 		}
 
