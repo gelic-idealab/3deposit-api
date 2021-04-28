@@ -23,11 +23,27 @@ import (
 
 // global config
 const maxUploadSizeMB = 20
+
+// user role levels.
 const (
-	userRoleAdmin    = 1
-	userRoleManager  = 2
-	userRoleUploader = 3
-	userRoleViewer   = 4
+	userRoleAdmin   = 1
+	userRoleManager = 2
+	userRoleUser    = 3
+)
+
+// member table scopes.
+const (
+	SCOPE_ORG        = "org"
+	SCOPE_COLLECTION = "col"
+	SCOPE_ENTITY     = "ent"
+	SCOPE_ITEM       = "item"
+	SCOPE_FILE       = "file"
+)
+
+// member table roles.
+const (
+	MEMBER_ROLE_OWNER  = "owner"
+	MEMBER_ROLE_MEMBER = "member"
 )
 
 var (
@@ -76,6 +92,7 @@ type Collection struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 	Desc string `json:"desc"`
+	Org  Org    `json:"org"`
 	// Metadata []Metadata `json:"metadata"`
 }
 
@@ -557,7 +574,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	token := r.Header.Get("X-API-KEY")
-	user, err := userHasPermissions(token, userRoleUploader)
+	user, err := userHasPermissions(token, userRoleUser)
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -696,7 +713,7 @@ func depositsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	token := r.Header.Get("X-API-KEY")
-	user, err := userHasPermissions(token, userRoleViewer)
+	user, err := userHasPermissions(token, userRoleUser)
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -1134,7 +1151,7 @@ func orgsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	token := r.Header.Get("X-API-KEY")
-	user, err := userHasPermissions(token, userRoleAdmin)
+	user, err := userHasPermissions(token, userRoleUser)
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -1147,6 +1164,7 @@ func orgsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == "GET" {
+		// Permissions: all valid users can GET.
 		rows, err := db.Query(`SELECT o.id, o.name, o.desc FROM organizations o;`)
 		if err != nil {
 			log.Println(err)
@@ -1166,7 +1184,7 @@ func orgsHandler(w http.ResponseWriter, r *http.Request) {
 			org.Owners = []User{} // init with empty array; json serialization will be null otherwise.
 
 			// Get org owners.
-			owners, err := db.Query(`SELECT DISTINCT u.id, u.email FROM users u JOIN owners o ON u.id = o.owner_id WHERE o.scope = "organization" AND o.ref_id = ?;`, org.ID)
+			owners, err := db.Query(`SELECT DISTINCT u.id, u.email FROM users u JOIN members o ON u.id = o.user_id WHERE o.scope = ? AND o.ref_id = ?;`, SCOPE_ORG, org.ID)
 			if err != nil {
 				log.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
@@ -1188,7 +1206,7 @@ func orgsHandler(w http.ResponseWriter, r *http.Request) {
 		// construct users data payload
 		orgsJSON, err := json.Marshal(orgs)
 		if err != nil {
-			log.Println("Error encoding users data", err)
+			log.Println("Error encoding orgs data", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -1197,6 +1215,13 @@ func orgsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == "POST" {
+		// Permissions: only valid admins can POST.
+		if user.RoleID != userRoleAdmin {
+			w.WriteHeader(http.StatusUnauthorized)
+			fmt.Fprint(w, "User not permitted.")
+			return
+		}
+
 		err := r.ParseMultipartForm(10 << maxUploadSizeMB) // maxUploadSizeMB will be held in memory, the rest of the form data will go to disk.
 		if err != nil {
 			log.Println(err)
@@ -1241,7 +1266,7 @@ func orgsHandler(w http.ResponseWriter, r *http.Request) {
 		ownersSlice := strings.Fields(ownerIds)
 		for i := range ownersSlice {
 			if ownersSlice[i] != "0" {
-				_, err := db.Exec("INSERT IGNORE INTO owners (scope, ref_id, owner_id) VALUES (?, ?, ?);", "organization", id, ownersSlice[i])
+				_, err := db.Exec("INSERT IGNORE INTO members (user_id, ref_id, scope, role) VALUES (?, ?, ?, ?);", ownersSlice[i], id, SCOPE_ORG, MEMBER_ROLE_OWNER)
 				if err != nil {
 					log.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
@@ -1256,6 +1281,12 @@ func orgsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == "DELETE" {
+		// Permissions: only valid admins can DELETE.
+		if user.RoleID != userRoleAdmin {
+			w.WriteHeader(http.StatusUnauthorized)
+			fmt.Fprint(w, "User not permitted.")
+			return
+		}
 		id := r.URL.Query().Get("id")
 		_, err = db.Exec(`DELETE FROM organizations WHERE id = ?`, id)
 		if err != nil {
@@ -1265,6 +1296,127 @@ func orgsHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		fmt.Fprintf(w, "Org deleted successfully: "+id)
+		return
+	}
+}
+
+func collectionsHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println(r.Method, r.RequestURI, r.RemoteAddr)
+	w.Header().Set("Access-Control-Allow-Origin", origin)
+	w.Header().Set("Access-Control-Allow-Headers", "X-API-KEY")
+	w.Header().Set("Access-Control-Allow-Methods", "DELETE")
+
+	if r.Method == "OPTIONS" {
+		return
+	}
+
+	token := r.Header.Get("X-API-KEY")
+	user, err := userHasPermissions(token, userRoleUser)
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, "Database error.")
+	}
+	if user.RoleID == 0 {
+		w.WriteHeader(http.StatusUnauthorized)
+		fmt.Fprint(w, "User not permitted.")
+		return
+	}
+
+	if r.Method == "GET" {
+		// Permissions: only admins or org members can GET.
+		// TODO(rob): check perms.
+
+		var rows *sql.Rows
+		var err error
+		if user.RoleID == 1 {
+			// return everything if user is admin.
+			rows, err = db.Query(`SELECT c.id, c.name, c.desc, o.id, o.name, o.desc FROM collections c JOIN organizations o ON c.org_id = o.id;`)
+		} else {
+			// only return collections where user is member or owner.
+			rows, err = db.Query(`SELECT c.id, c.name, c.desc, o.id, o.name, o.desc FROM collections c JOIN organizations o ON c.org_id = o.id JOIN members m ON m.user_id = ? WHERE m.scope = ? AND (m.role = ? OR m.role = ?) ;`, user.ID, SCOPE_COLLECTION, MEMBER_ROLE_MEMBER, MEMBER_ROLE_OWNER)
+		}
+		if err != nil {
+			log.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, "Database error.")
+			return
+		}
+		cols := []Collection{}
+		for rows.Next() {
+			col := Collection{}
+			err := rows.Scan(&col.ID, &col.Name, &col.Desc, &col.Org.ID, &col.Org.Name, &col.Org.Desc)
+			if err != nil {
+				log.Println(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			cols = append(cols, col)
+		}
+
+		// construct users data payload
+		colsJSON, err := json.Marshal(cols)
+		if err != nil {
+			log.Println("Error encoding collections data", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		fmt.Fprint(w, string(colsJSON))
+		return
+	}
+
+	if r.Method == "POST" {
+		// Permissions: only admins or org members can POST.
+		// TODO(rob): check perms.
+		err := r.ParseMultipartForm(10 << maxUploadSizeMB) // maxUploadSizeMB will be held in memory, the rest of the form data will go to disk.
+		if err != nil {
+			log.Println(err)
+			fmt.Fprintln(w, err)
+			return
+		}
+
+		id, _ := strconv.ParseInt(r.FormValue("id"), 10, 64)
+		name := r.FormValue("name")
+		desc := r.FormValue("desc")
+		org := r.FormValue("org")
+
+		if id != 0 {
+			// update existing org record
+			log.Println("Update collection data for:", name)
+			_, err = db.Exec(`UPDATE collections c SET c.name=?, c.desc=? c.org_id=? WHERE c.id=?;`, name, desc, org, id)
+			if err != nil {
+				log.Println(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprint(w, "Error updating collection data.")
+				return
+			}
+		} else {
+			// write new db record
+			_, err := db.Exec("INSERT INTO collections (name, `desc`, org_id) VALUES (?, ?, ?);", name, desc, org)
+			if err != nil {
+				log.Println(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprint(w, "Database error.")
+				return
+			}
+		}
+
+		fmt.Fprintf(w, "Collection data saved successfully: "+name)
+		return
+	}
+
+	if r.Method == "DELETE" {
+		// Permissions: only admins or collection owners can DELETE.
+		// TODO(rob): check perms
+		id := r.URL.Query().Get("id")
+		_, err = db.Exec(`DELETE FROM collections WHERE id = ?`, id)
+		if err != nil {
+			log.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, "Database error.")
+			return
+		}
+		fmt.Fprintf(w, "Collection deleted successfully: "+id)
 		return
 	}
 }
@@ -1647,6 +1799,7 @@ func main() {
 	http.HandleFunc("/upload", uploadHandler)
 	http.HandleFunc("/users", usersHandler)
 	http.HandleFunc("/orgs", orgsHandler)
+	http.HandleFunc("/collections", collectionsHandler)
 
 	// serve
 	log.Println("Serving on :8081")

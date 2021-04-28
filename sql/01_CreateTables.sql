@@ -19,13 +19,21 @@ CREATE TABLE `users` (
     FOREIGN KEY (role_id) REFERENCES roles(id)
 );
 
-CREATE TABLE `owners` (
+CREATE TABLE `members` (
   `id` INT NOT NULL AUTO_INCREMENT,
-  `scope` VARCHAR(32) NULL,
+  `user_id` INT NULL,
   `ref_id` INT NULL,
-  `owner_id` INT NULL,
-  UNIQUE(scope, ref_id, owner_id),
+  `scope` varchar(20) NULL,
+  `role` varchar(20) NULL,
   PRIMARY KEY (`id`));
+
+-- CREATE TABLE `owners` (
+--   `id` INT NOT NULL AUTO_INCREMENT,
+--   `scope` VARCHAR(32) NULL,
+--   `ref_id` INT NULL,
+--   `owner_id` INT NULL,
+--   UNIQUE(scope, ref_id, owner_id),
+--   PRIMARY KEY (`id`));
 
 CREATE TABLE `deposit_types` (
     `id` int NOT NULL AUTO_INCREMENT,
