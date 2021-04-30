@@ -422,7 +422,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 				success = true
 			} else {
 				w.WriteHeader(http.StatusNotFound)
-				fmt.Fprintln(w, "User record is invalid.")
+				fmt.Fprintln(w, "Invalid login information.")
 				return
 			}
 
@@ -441,8 +441,6 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 				// generate new token and expiration
 				expires := now.AddDate(0, 0, 1)
 				user.Token = uuid.New().String()
-
-				fmt.Println("expires:", expires)
 
 				// write db record
 				_, err = db.Exec(`INSERT INTO tokens (token, user_id, expires) VALUES (?, ?, ?);`, user.Token, user.ID, expires)
@@ -465,7 +463,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		// no email and/or password in request
-		fmt.Fprintln(w, "Invalid login information.")
+		fmt.Fprintln(w, "Missing login information.")
 	}
 }
 
