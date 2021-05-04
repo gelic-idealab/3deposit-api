@@ -98,9 +98,10 @@ type Collection struct {
 
 // Grouping for all entities and files
 type Item struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	Desc string `json:"desc"`
+	ID         string     `json:"id"`
+	Name       string     `json:"name"`
+	Desc       string     `json:"desc"`
+	Collection Collection `json:"collection"`
 	// Metadata []Metadata `json:"metadata"`
 }
 
@@ -114,10 +115,9 @@ type Entity struct {
 
 // Literal file records
 type File struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Desc  string `json:"desc"`
-	Scope string `json:"scope"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Desc string `json:"desc"`
 	// Metadata []Metadata `json:"metadata"`
 }
 
@@ -1419,6 +1419,127 @@ func collectionsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func itemsHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println(r.Method, r.RequestURI, r.RemoteAddr)
+	w.Header().Set("Access-Control-Allow-Origin", origin)
+	w.Header().Set("Access-Control-Allow-Headers", "X-API-KEY")
+	w.Header().Set("Access-Control-Allow-Methods", "DELETE")
+
+	if r.Method == "OPTIONS" {
+		return
+	}
+
+	token := r.Header.Get("X-API-KEY")
+	user, err := userHasPermissions(token, userRoleUser)
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, "Database error.")
+	}
+	if user.RoleID == 0 {
+		w.WriteHeader(http.StatusUnauthorized)
+		fmt.Fprint(w, "User not permitted.")
+		return
+	}
+
+	if r.Method == "GET" {
+		// Permissions: only admins or org members can GET.
+		// TODO(rob): check perms.
+
+		var rows *sql.Rows
+		var err error
+		if user.RoleID == 1 {
+			// return everything if user is admin.
+			rows, err = db.Query(`SELECT i.id, i.name, i.desc, c.id, c.name, c.desc FROM items i JOIN collections c ON i.collection_id = c.id;`)
+		} else {
+			// only return items where user is member or owner of collection.
+			rows, err = db.Query(`SELECT i.id, i.name, i.desc, c.id, c.name, c.desc FROM items i JOIN collections c ON i.collection_id = c.id JOIN members m ON m.user_id = ? WHERE m.scope = ? AND (m.role = ? OR m.role = ?) ;`, user.ID, SCOPE_COLLECTION, MEMBER_ROLE_MEMBER, MEMBER_ROLE_OWNER)
+		}
+		if err != nil {
+			log.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, "Database error.")
+			return
+		}
+		items := []Item{}
+		for rows.Next() {
+			item := Item{}
+			err := rows.Scan(&item.ID, &item.Name, &item.Desc, &item.Collection.ID, &item.Collection.Name, &item.Collection.Desc)
+			if err != nil {
+				log.Println(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			items = append(items, item)
+		}
+
+		// construct users data payload
+		itemsJSON, err := json.Marshal(items)
+		if err != nil {
+			log.Println("Error encoding collections data", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		fmt.Fprint(w, string(itemsJSON))
+		return
+	}
+
+	// if r.Method == "POST" {
+	// 	// Permissions: only admins or org members can POST.
+	// 	// TODO(rob): check perms.
+	// 	err := r.ParseMultipartForm(10 << maxUploadSizeMB) // maxUploadSizeMB will be held in memory, the rest of the form data will go to disk.
+	// 	if err != nil {
+	// 		log.Println(err)
+	// 		fmt.Fprintln(w, err)
+	// 		return
+	// 	}
+
+	// 	id, _ := strconv.ParseInt(r.FormValue("id"), 10, 64)
+	// 	name := r.FormValue("name")
+	// 	desc := r.FormValue("desc")
+	// 	org := r.FormValue("org")
+
+	// 	if id != 0 {
+	// 		// update existing org record
+	// 		log.Println("Update collection data for:", name)
+	// 		_, err = db.Exec(`UPDATE collections c SET c.name=?, c.desc=? c.org_id=? WHERE c.id=?;`, name, desc, org, id)
+	// 		if err != nil {
+	// 			log.Println(err)
+	// 			w.WriteHeader(http.StatusInternalServerError)
+	// 			fmt.Fprint(w, "Error updating collection data.")
+	// 			return
+	// 		}
+	// 	} else {
+	// 		// write new db record
+	// 		_, err := db.Exec("INSERT INTO collections (name, `desc`, org_id) VALUES (?, ?, ?);", name, desc, org)
+	// 		if err != nil {
+	// 			log.Println(err)
+	// 			w.WriteHeader(http.StatusInternalServerError)
+	// 			fmt.Fprint(w, "Database error.")
+	// 			return
+	// 		}
+	// 	}
+
+	// 	fmt.Fprintf(w, "Collection data saved successfully: "+name)
+	// 	return
+	// }
+
+	// if r.Method == "DELETE" {
+	// 	// Permissions: only admins or collection owners can DELETE.
+	// 	// TODO(rob): check perms
+	// 	id := r.URL.Query().Get("id")
+	// 	_, err = db.Exec(`DELETE FROM collections WHERE id = ?`, id)
+	// 	if err != nil {
+	// 		log.Println(err)
+	// 		w.WriteHeader(http.StatusInternalServerError)
+	// 		fmt.Fprint(w, "Database error.")
+	// 		return
+	// 	}
+	// 	fmt.Fprintf(w, "Collection deleted successfully: "+id)
+	// 	return
+	// }
+}
+
 func metadataHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println(r.Method, r.RequestURI, r.RemoteAddr)
 	w.Header().Set("Access-Control-Allow-Origin", origin)
@@ -1798,6 +1919,7 @@ func main() {
 	http.HandleFunc("/users", usersHandler)
 	http.HandleFunc("/orgs", orgsHandler)
 	http.HandleFunc("/collections", collectionsHandler)
+	http.HandleFunc("/items", itemsHandler)
 
 	// serve
 	log.Println("Serving on :8081")
