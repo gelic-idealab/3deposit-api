@@ -1484,60 +1484,60 @@ func itemsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// if r.Method == "POST" {
-	// 	// Permissions: only admins or org members can POST.
-	// 	// TODO(rob): check perms.
-	// 	err := r.ParseMultipartForm(10 << maxUploadSizeMB) // maxUploadSizeMB will be held in memory, the rest of the form data will go to disk.
-	// 	if err != nil {
-	// 		log.Println(err)
-	// 		fmt.Fprintln(w, err)
-	// 		return
-	// 	}
+	if r.Method == "POST" {
+		// Permissions: only admins or org members can POST.
+		// TODO(rob): check perms.
+		err := r.ParseMultipartForm(10 << maxUploadSizeMB) // maxUploadSizeMB will be held in memory, the rest of the form data will go to disk.
+		if err != nil {
+			log.Println(err)
+			fmt.Fprintln(w, err)
+			return
+		}
 
-	// 	id, _ := strconv.ParseInt(r.FormValue("id"), 10, 64)
-	// 	name := r.FormValue("name")
-	// 	desc := r.FormValue("desc")
-	// 	org := r.FormValue("org")
+		id, _ := strconv.ParseInt(r.FormValue("id"), 10, 64)
+		name := r.FormValue("name")
+		desc := r.FormValue("desc")
+		collection := r.FormValue("collection")
 
-	// 	if id != 0 {
-	// 		// update existing org record
-	// 		log.Println("Update collection data for:", name)
-	// 		_, err = db.Exec(`UPDATE collections c SET c.name=?, c.desc=? c.org_id=? WHERE c.id=?;`, name, desc, org, id)
-	// 		if err != nil {
-	// 			log.Println(err)
-	// 			w.WriteHeader(http.StatusInternalServerError)
-	// 			fmt.Fprint(w, "Error updating collection data.")
-	// 			return
-	// 		}
-	// 	} else {
-	// 		// write new db record
-	// 		_, err := db.Exec("INSERT INTO collections (name, `desc`, org_id) VALUES (?, ?, ?);", name, desc, org)
-	// 		if err != nil {
-	// 			log.Println(err)
-	// 			w.WriteHeader(http.StatusInternalServerError)
-	// 			fmt.Fprint(w, "Database error.")
-	// 			return
-	// 		}
-	// 	}
+		if id != 0 {
+			// update existing org record
+			log.Println("Update item data for:", name)
+			_, err = db.Exec(`UPDATE items i SET i.name=?, i.desc=? i.collection_id=? WHERE i.id=?;`, name, desc, collection, id)
+			if err != nil {
+				log.Println(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprint(w, "Error updating item data.")
+				return
+			}
+		} else {
+			// write new db record
+			_, err := db.Exec("INSERT INTO items (name, `desc`, collection_id) VALUES (?, ?, ?);", name, desc, collection)
+			if err != nil {
+				log.Println(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprint(w, "Database error.")
+				return
+			}
+		}
 
-	// 	fmt.Fprintf(w, "Collection data saved successfully: "+name)
-	// 	return
-	// }
+		fmt.Fprintf(w, "Item data saved successfully: "+name)
+		return
+	}
 
-	// if r.Method == "DELETE" {
-	// 	// Permissions: only admins or collection owners can DELETE.
-	// 	// TODO(rob): check perms
-	// 	id := r.URL.Query().Get("id")
-	// 	_, err = db.Exec(`DELETE FROM collections WHERE id = ?`, id)
-	// 	if err != nil {
-	// 		log.Println(err)
-	// 		w.WriteHeader(http.StatusInternalServerError)
-	// 		fmt.Fprint(w, "Database error.")
-	// 		return
-	// 	}
-	// 	fmt.Fprintf(w, "Collection deleted successfully: "+id)
-	// 	return
-	// }
+	if r.Method == "DELETE" {
+		// Permissions: only admins or collection owners can DELETE.
+		// TODO(rob): check perms
+		id := r.URL.Query().Get("id")
+		_, err = db.Exec(`DELETE FROM items WHERE id = ?`, id)
+		if err != nil {
+			log.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, "Database error.")
+			return
+		}
+		fmt.Fprintf(w, "Item deleted successfully: "+id)
+		return
+	}
 }
 
 func metadataHandler(w http.ResponseWriter, r *http.Request) {
