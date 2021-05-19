@@ -1658,7 +1658,8 @@ func filesHandler(w http.ResponseWriter, r *http.Request) {
 		defer fileData.Close()
 
 		// construct object "path"
-		pathElements := []string{org, col, item, name}
+		// TODO(rob): generate guid for object "name", instead of using filename.
+		pathElements := []string{org, col, item, file.Filename}
 		objectName := strings.Join(pathElements, "/")
 
 		// put object into default bucket
