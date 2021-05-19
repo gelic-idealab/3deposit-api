@@ -105,19 +105,24 @@ type Item struct {
 	// Metadata []Metadata `json:"metadata"`
 }
 
+// NOTE(rob): deprecated, file attached directly to Items.
 // Grouping for all sub-item entities
-type Entity struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	Desc string `json:"desc"`
-	// Metadata []Metadata `json:"metadata"`
-}
+// type Entity struct {
+// 	ID   string `json:"id"`
+// 	Name string `json:"name"`
+// 	Desc string `json:"desc"`
+// 	// Metadata []Metadata `json:"metadata"`
+// }
 
 // Literal file records
 type File struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 	Desc string `json:"desc"`
+	Item Item   `json:"item"`
+	MD5  string `json:"md5"`
+	Size int    `json:"size"`
+	Ext  string `json:"ext"`
 	// Metadata []Metadata `json:"metadata"`
 }
 
@@ -1443,7 +1448,7 @@ func itemsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == "GET" {
-		// Permissions: only admins or org members can GET.
+		// Permissions: only admins or collection members can GET.
 		// TODO(rob): check perms.
 
 		var rows *sql.Rows
@@ -1538,6 +1543,184 @@ func itemsHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Item deleted successfully: "+id)
 		return
 	}
+}
+
+func filesHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println(r.Method, r.RequestURI, r.RemoteAddr)
+	w.Header().Set("Access-Control-Allow-Origin", origin)
+	w.Header().Set("Access-Control-Allow-Headers", "X-API-KEY")
+	w.Header().Set("Access-Control-Allow-Methods", "DELETE")
+
+	if r.Method == "OPTIONS" {
+		return
+	}
+
+	token := r.Header.Get("X-API-KEY")
+	user, err := userHasPermissions(token, userRoleManager)
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, "Database error.")
+	}
+	if user.RoleID == 0 {
+		w.WriteHeader(http.StatusUnauthorized)
+		fmt.Fprint(w, "User not permitted.")
+		return
+	}
+
+	if r.Method == "GET" {
+		// Permissions: only admins or collection members can GET.
+		// TODO(rob): check perms.
+
+		var rows *sql.Rows
+		var err error
+		if user.RoleID == 1 {
+			// return everything if user is admin.
+			rows, err = db.Query(`SELECT f.id, f.name, f.desc, f.md5, f.size, f.ext, i.id, i.name, i.desc, c.id, c.name, c.desc FROM files f JOIN items i ON i.id = f.item_id JOIN collections c ON i.collection_id = c.id;`)
+		} else {
+			// only return items where user is member or owner of collection.
+			rows, err = db.Query(`SELECT f.id, f.name, f.desc, f.md5, f.size, f.ext, i.id, i.name, i.desc, c.id, c.name, c.desc FROM files f JOIN items i ON i.id = f.item_id JOIN collections c ON i.collection_id = c.id JOIN members m ON m.user_id = ? WHERE m.scope = ? AND (m.role = ? OR m.role = ?) ;`, user.ID, SCOPE_COLLECTION, MEMBER_ROLE_MEMBER, MEMBER_ROLE_OWNER)
+		}
+		if err != nil {
+			log.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, "Database error.")
+			return
+		}
+		files := []File{}
+		for rows.Next() {
+			file := File{}
+			err := rows.Scan(&file.ID, &file.Name, &file.Desc, &file.MD5, &file.Size, &file.Ext, &file.Item.ID, &file.Item.Name, &file.Item.Desc, &file.Item.Collection.ID, &file.Item.Collection.Name, &file.Item.Collection.Desc)
+			if err != nil {
+				log.Println(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			files = append(files, file)
+		}
+
+		// construct users data payload
+		filesJSON, err := json.Marshal(files)
+		if err != nil {
+			log.Println("Error encoding files data", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		fmt.Fprint(w, string(filesJSON))
+		return
+	}
+
+	if r.Method == "POST" {
+		err := r.ParseMultipartForm(10 << maxUploadSizeMB)
+		if err != nil {
+			log.Println(err)
+			fmt.Fprintln(w, err)
+			return
+		}
+
+		// Unpack and store form data
+		formdata := r.MultipartForm
+		file := formdata.File["file"][0]
+		id, _ := strconv.ParseInt(r.FormValue("id"), 10, 64)
+		name := r.FormValue("name")
+		desc := r.FormValue("desc")
+		item := r.FormValue("item")
+		col := ""
+		org := ""
+
+		// get item info
+		rows, err := db.Query(`SELECT c.id, o.id FROM items i JOIN collections c ON i.collection_id = c.id JOIN organizations o ON c.org_id = o.id;`)
+		if err != nil {
+			log.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, "Database error.")
+			return
+		}
+		for rows.Next() {
+			err := rows.Scan(&col, &org)
+			if err != nil {
+				log.Println(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+		}
+		// get some file info
+		size := file.Size
+		ext := strings.Split(file.Filename, ".")[1]
+
+		// store the file object.
+		fileData, err := file.Open()
+		if err != nil {
+			log.Println("Error opening file:", file.Filename)
+			fmt.Fprintln(w, err)
+			return
+		}
+		defer fileData.Close()
+
+		// construct object "path"
+		pathElements := []string{org, col, item, name}
+		objectName := strings.Join(pathElements, "/")
+
+		// put object into default bucket
+		info, err := minioClient.PutObject(context.Background(), defaultBucketName, objectName, fileData, size, minio.PutObjectOptions{})
+		if err != nil {
+			log.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, "Error putting object.")
+			return
+		}
+		log.Println("Successfully put object:", info)
+		md5 := info.ETag
+
+		if id != 0 {
+			// update existing org record
+			log.Println("Update file data for:", name)
+			_, err = db.Exec(`UPDATE files f SET f.name=?, f.desc=? f.item_id=?, f.md5, f.size, f.ext WHERE f.id=?;`, name, desc, item, md5, ext, id)
+			if err != nil {
+				log.Println(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprint(w, "Database error.")
+				return
+			}
+		} else {
+			// write new db record
+			_, err := db.Exec("INSERT INTO files (name, `desc`, item_id, md5, size, ext) VALUES (?, ?, ?, ?, ?, ?);", name, desc, item, md5, size, ext)
+			if err != nil {
+				log.Println(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprint(w, "Database error.")
+				return
+			}
+		}
+
+		// TODO(rob): generate file metadata.
+	}
+
+	// if r.Method == "DELETE" {
+	// 	id := r.URL.Query().Get("id")
+	// 	filename := r.URL.Query().Get("fn")
+	// 	if id == "" || filename == "" {
+	// 		log.Println("Missing required data.")
+	// 		w.WriteHeader(http.StatusInternalServerError)
+	// 		fmt.Fprint(w, "Missing required data for this request.")
+	// 		return
+	// 	}
+	// 	object := id + "/" + filename
+	// 	opts := minio.RemoveObjectOptions{}
+	// 	err = minioClient.RemoveObject(context.Background(), defaultBucketName, object, opts)
+	// 	if err != nil {
+	// 		log.Println(err)
+	// 		w.WriteHeader(http.StatusInternalServerError)
+	// 		fmt.Fprint(w, "Storage error.")
+	// 		return
+	// 	}
+
+	// 	// TODO(rob): update deposit size.
+
+	// 	fmt.Fprint(w, "Sucessfully deleted object: "+object)
+	// 	return
+	// }
+
 }
 
 func metadataHandler(w http.ResponseWriter, r *http.Request) {
@@ -1791,103 +1974,6 @@ func depositMetadataHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Method not supported.")
 }
 
-func depositFileHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println(r.Method, r.RequestURI, r.RemoteAddr)
-	w.Header().Set("Access-Control-Allow-Origin", origin)
-	w.Header().Set("Access-Control-Allow-Headers", "X-API-KEY")
-	w.Header().Set("Access-Control-Allow-Methods", "DELETE")
-
-	if r.Method == "OPTIONS" {
-		return
-	}
-
-	token := r.Header.Get("X-API-KEY")
-	user, err := userHasPermissions(token, userRoleManager)
-	if err != nil {
-		log.Println(err)
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprint(w, "Database error.")
-	}
-	if user.RoleID == 0 {
-		w.WriteHeader(http.StatusUnauthorized)
-		fmt.Fprint(w, "User not permitted.")
-		return
-	}
-
-	if r.Method == "POST" {
-		err := r.ParseMultipartForm(10 << maxUploadSizeMB)
-		if err != nil {
-			log.Println(err)
-			fmt.Fprintln(w, err)
-			return
-		}
-
-		// Unpack and store form data
-		formdata := r.MultipartForm
-		files := formdata.File["file"]
-
-		depositID := r.FormValue("id")
-		if depositID == "" {
-			log.Println("No deposit id.")
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprint(w, "Deposit ID required.")
-			return
-		}
-
-		for i := range files {
-			filename := files[i].Filename
-			log.Println("Processing file:", filename)
-
-			size := files[i].Size
-
-			file, err := files[i].Open()
-			if err != nil {
-				fmt.Fprintln(w, err)
-				return
-			}
-			defer file.Close()
-
-			// put object into default bucket
-			info, err := minioClient.PutObject(context.Background(), defaultBucketName, depositID+"/"+filename, file, size, minio.PutObjectOptions{})
-			if err != nil {
-				log.Println(err)
-				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Fprint(w, "Storage error.")
-				return
-			}
-			log.Println("Successfully put object:", info)
-
-			// TODO(rob): generate file metadata.
-		}
-	}
-
-	if r.Method == "DELETE" {
-		id := r.URL.Query().Get("id")
-		filename := r.URL.Query().Get("fn")
-		if id == "" || filename == "" {
-			log.Println("Missing required data.")
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprint(w, "Missing required data for this request.")
-			return
-		}
-		object := id + "/" + filename
-		opts := minio.RemoveObjectOptions{}
-		err = minioClient.RemoveObject(context.Background(), defaultBucketName, object, opts)
-		if err != nil {
-			log.Println(err)
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprint(w, "Storage error.")
-			return
-		}
-
-		// TODO(rob): update deposit size.
-
-		fmt.Fprint(w, "Sucessfully deleted object: "+object)
-		return
-	}
-
-}
-
 func main() {
 
 	// check that application secret is configured
@@ -1909,7 +1995,6 @@ func main() {
 
 	// route handlers
 	http.HandleFunc("/", dashboardHandler)
-	http.HandleFunc("/deposit/files", depositFileHandler)
 	http.HandleFunc("/deposit/metadata", depositMetadataHandler)
 	http.HandleFunc("/deposits", depositsHandler)
 	http.HandleFunc("/download", downloadHandler)
@@ -1920,6 +2005,7 @@ func main() {
 	http.HandleFunc("/orgs", orgsHandler)
 	http.HandleFunc("/collections", collectionsHandler)
 	http.HandleFunc("/items", itemsHandler)
+	http.HandleFunc("/files", filesHandler)
 
 	// serve
 	log.Println("Serving on :8081")

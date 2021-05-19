@@ -77,20 +77,24 @@ CREATE TABLE `items` (
     PRIMARY KEY (id)
 );
 
-CREATE TABLE `entities` (
-    `id` int NOT NULL AUTO_INCREMENT,
-    `name` varchar(256) NOT NULL,
-    `desc` varchar(256) NOT NULL,
-    `item_id` int DEFAULT NULL,
-    PRIMARY KEY (id)
-);
+-- NOTE(rob): deprecated, files attached directly to Items
+-- CREATE TABLE `entities` (
+--     `id` int NOT NULL AUTO_INCREMENT,
+--     `name` varchar(256) NOT NULL,
+--     `desc` varchar(256) NOT NULL,
+--     `item_id` int DEFAULT NULL,
+--     PRIMARY KEY (id)
+-- );
 
 CREATE TABLE `files` (
-    `id` int NOT NULL AUTO_INCREMENT,
-    `name` varchar(256) NOT NULL,
-    `desc` varchar(4096) NOT NULL,
-    `entity_id` int DEFAULT NULL,
-    PRIMARY KEY (id)
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(256) NOT NULL,
+  `desc` varchar(4096) NOT NULL,
+  `item_id` int(11) DEFAULT NULL,
+  `md5` varchar(45) DEFAULT NULL,
+  `size` int(11) DEFAULT NULL,
+  `ext` varchar(45) DEFAULT NULL,
+  PRIMARY KEY (`id`)
 );
 
 CREATE TABLE `tokens` (
