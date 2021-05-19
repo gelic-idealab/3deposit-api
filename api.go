@@ -116,13 +116,14 @@ type Item struct {
 
 // Literal file records
 type File struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	Desc string `json:"desc"`
-	Item Item   `json:"item"`
-	MD5  string `json:"md5"`
-	Size int    `json:"size"`
-	Ext  string `json:"ext"`
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Desc     string `json:"desc"`
+	Item     Item   `json:"item"`
+	Filename string `json:"filename"`
+	MD5      string `json:"md5"`
+	Size     int    `json:"size"`
+	Ext      string `json:"ext"`
 	// Metadata []Metadata `json:"metadata"`
 }
 
@@ -1576,10 +1577,10 @@ func filesHandler(w http.ResponseWriter, r *http.Request) {
 		var err error
 		if user.RoleID == 1 {
 			// return everything if user is admin.
-			rows, err = db.Query(`SELECT f.id, f.name, f.desc, f.md5, f.size, f.ext, i.id, i.name, i.desc, c.id, c.name, c.desc FROM files f JOIN items i ON i.id = f.item_id JOIN collections c ON i.collection_id = c.id;`)
+			rows, err = db.Query(`SELECT f.id, f.name, f.desc, f.filename, f.md5, f.size, f.ext, i.id, i.name, i.desc, c.id, c.name, c.desc FROM files f JOIN items i ON i.id = f.item_id JOIN collections c ON i.collection_id = c.id;`)
 		} else {
 			// only return items where user is member or owner of collection.
-			rows, err = db.Query(`SELECT f.id, f.name, f.desc, f.md5, f.size, f.ext, i.id, i.name, i.desc, c.id, c.name, c.desc FROM files f JOIN items i ON i.id = f.item_id JOIN collections c ON i.collection_id = c.id JOIN members m ON m.user_id = ? WHERE m.scope = ? AND (m.role = ? OR m.role = ?) ;`, user.ID, SCOPE_COLLECTION, MEMBER_ROLE_MEMBER, MEMBER_ROLE_OWNER)
+			rows, err = db.Query(`SELECT f.id, f.name, f.desc, f.filename, f.md5, f.size, f.ext, i.id, i.name, i.desc, c.id, c.name, c.desc FROM files f JOIN items i ON i.id = f.item_id JOIN collections c ON i.collection_id = c.id JOIN members m ON m.user_id = ? WHERE m.scope = ? AND (m.role = ? OR m.role = ?) ;`, user.ID, SCOPE_COLLECTION, MEMBER_ROLE_MEMBER, MEMBER_ROLE_OWNER)
 		}
 		if err != nil {
 			log.Println(err)
@@ -1590,7 +1591,7 @@ func filesHandler(w http.ResponseWriter, r *http.Request) {
 		files := []File{}
 		for rows.Next() {
 			file := File{}
-			err := rows.Scan(&file.ID, &file.Name, &file.Desc, &file.MD5, &file.Size, &file.Ext, &file.Item.ID, &file.Item.Name, &file.Item.Desc, &file.Item.Collection.ID, &file.Item.Collection.Name, &file.Item.Collection.Desc)
+			err := rows.Scan(&file.ID, &file.Name, &file.Desc, &file.Filename, &file.MD5, &file.Size, &file.Ext, &file.Item.ID, &file.Item.Name, &file.Item.Desc, &file.Item.Collection.ID, &file.Item.Collection.Name, &file.Item.Collection.Desc)
 			if err != nil {
 				log.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
@@ -1645,6 +1646,7 @@ func filesHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		// get some file info
+		filename := file.Filename
 		size := file.Size
 		ext := strings.Split(file.Filename, ".")[1]
 
@@ -1676,7 +1678,7 @@ func filesHandler(w http.ResponseWriter, r *http.Request) {
 		if id != 0 {
 			// update existing org record
 			log.Println("Update file data for:", name)
-			_, err = db.Exec(`UPDATE files f SET f.name=?, f.desc=? f.item_id=?, f.md5, f.size, f.ext WHERE f.id=?;`, name, desc, item, md5, ext, id)
+			_, err = db.Exec(`UPDATE files f SET f.name=?, f.desc=?, f.item_id=?, f.filename=?,f.md5=?, f.size=?, f.ext=? WHERE f.id=?;`, name, desc, item, filename, md5, ext, id)
 			if err != nil {
 				log.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
@@ -1685,7 +1687,7 @@ func filesHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		} else {
 			// write new db record
-			_, err := db.Exec("INSERT INTO files (name, `desc`, item_id, md5, size, ext) VALUES (?, ?, ?, ?, ?, ?);", name, desc, item, md5, size, ext)
+			_, err := db.Exec("INSERT INTO files (name, `desc`, item_id, filename, md5, size, ext) VALUES (?, ?, ?, ?, ?, ?, ?);", name, desc, item, filename, md5, size, ext)
 			if err != nil {
 				log.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
