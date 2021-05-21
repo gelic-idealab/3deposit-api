@@ -81,18 +81,20 @@ type Dashboard struct {
 
 // Top-level grouping for all collections, items, entities, and files
 type Org struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Desc   string `json:"desc"`
-	Owners []User `json:"owners"`
+	ID          string       `json:"id"`
+	Name        string       `json:"name"`
+	Desc        string       `json:"desc"`
+	Collections []Collection `json:"collections"`
+	Owners      []User       `json:"owners"`
 }
 
 // Grouping for all items, entities, and files
 type Collection struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	Desc string `json:"desc"`
-	Org  Org    `json:"org"`
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Desc  string `json:"desc"`
+	Org   Org    `json:"org"`
+	Items []Item `json:"items"`
 	// Metadata []Metadata `json:"metadata"`
 }
 
@@ -102,6 +104,7 @@ type Item struct {
 	Name       string     `json:"name"`
 	Desc       string     `json:"desc"`
 	Collection Collection `json:"collection"`
+	Files      []File     `json:"files"`
 	// Metadata []Metadata `json:"metadata"`
 }
 
@@ -1476,6 +1479,26 @@ func itemsHandler(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
+
+			// construct Files slice using item id
+			fileRows, err := db.Query(`SELECT f.id, f.name, f.desc, f.filename, f.md5, f.size, f.ext FROM files f WHERE f.item_id = ?;`, item.ID)
+			if err != nil {
+				log.Println(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprint(w, "Database error.")
+				return
+			}
+			for fileRows.Next() {
+				file := File{}
+				err := fileRows.Scan(&file.ID, &file.Name, &file.Desc, &file.Filename, &file.MD5, &file.Size, &file.Ext)
+				if err != nil {
+					log.Println(err)
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				item.Files = append(item.Files, file)
+			}
+
 			items = append(items, item)
 		}
 
