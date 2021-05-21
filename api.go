@@ -1577,10 +1577,27 @@ func filesHandler(w http.ResponseWriter, r *http.Request) {
 		var err error
 		if user.RoleID == 1 {
 			// return everything if user is admin.
-			rows, err = db.Query(`SELECT f.id, f.name, f.desc, f.filename, f.md5, f.size, f.ext, i.id, i.name, i.desc, c.id, c.name, c.desc FROM files f JOIN items i ON i.id = f.item_id JOIN collections c ON i.collection_id = c.id;`)
+			rows, err = db.Query(`SELECT 
+									f.id, f.name, f.desc, f.filename, f.md5, f.size, f.ext, 
+									i.id, i.name, i.desc, 
+									c.id, c.name, c.desc,
+									o.id, o.name, o.desc
+								FROM files f 
+								JOIN items i ON i.id = f.item_id 
+								JOIN collections c ON i.collection_id = c.id
+								JOIN organizations o on c.org_id = o.id;`)
 		} else {
 			// only return items where user is member or owner of collection.
-			rows, err = db.Query(`SELECT f.id, f.name, f.desc, f.filename, f.md5, f.size, f.ext, i.id, i.name, i.desc, c.id, c.name, c.desc FROM files f JOIN items i ON i.id = f.item_id JOIN collections c ON i.collection_id = c.id JOIN members m ON m.user_id = ? WHERE m.scope = ? AND (m.role = ? OR m.role = ?) ;`, user.ID, SCOPE_COLLECTION, MEMBER_ROLE_MEMBER, MEMBER_ROLE_OWNER)
+			rows, err = db.Query(`SELECT 
+									f.id, f.name, f.desc, f.filename, f.md5, f.size, f.ext, 
+									i.id, i.name, i.desc, 
+									c.id, c.name, c.desc,
+									o.id, o.name, o.desc
+									FROM files f JOIN items i ON i.id = f.item_id 
+									JOIN collections c ON i.collection_id = c.id
+									JOIN organization o ON c.org_id = o.id
+									JOIN members m ON m.user_id = ? 
+									WHERE m.scope = ? AND (m.role = ? OR m.role = ?) ;`, user.ID, SCOPE_COLLECTION, MEMBER_ROLE_MEMBER, MEMBER_ROLE_OWNER)
 		}
 		if err != nil {
 			log.Println(err)
@@ -1591,7 +1608,10 @@ func filesHandler(w http.ResponseWriter, r *http.Request) {
 		files := []File{}
 		for rows.Next() {
 			file := File{}
-			err := rows.Scan(&file.ID, &file.Name, &file.Desc, &file.Filename, &file.MD5, &file.Size, &file.Ext, &file.Item.ID, &file.Item.Name, &file.Item.Desc, &file.Item.Collection.ID, &file.Item.Collection.Name, &file.Item.Collection.Desc)
+			err := rows.Scan(&file.ID, &file.Name, &file.Desc, &file.Filename, &file.MD5, &file.Size, &file.Ext,
+				&file.Item.ID, &file.Item.Name, &file.Item.Desc,
+				&file.Item.Collection.ID, &file.Item.Collection.Name, &file.Item.Collection.Desc,
+				&file.Item.Collection.Org.ID, &file.Item.Collection.Org.Name, &file.Item.Collection.Org.Desc)
 			if err != nil {
 				log.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
