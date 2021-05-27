@@ -27,32 +27,12 @@ CREATE TABLE `members` (
   `role` varchar(20) NULL,
   PRIMARY KEY (`id`));
 
--- CREATE TABLE `owners` (
---   `id` INT NOT NULL AUTO_INCREMENT,
---   `scope` VARCHAR(32) NULL,
---   `ref_id` INT NULL,
---   `owner_id` INT NULL,
---   UNIQUE(scope, ref_id, owner_id),
---   PRIMARY KEY (`id`));
 
 CREATE TABLE `deposit_types` (
     `id` int NOT NULL AUTO_INCREMENT,
     `type` varchar(20) NOT NULL,
     PRIMARY KEY (id)
 );
-
--- CREATE TABLE `deposits` (
---     `id` varchar(50) NOT NULL,
---     `name` varchar(50) NOT NULL,
---     `desc` varchar(250) NOT NULL,
---     `created` timestamp,
---     `updated` timestamp,
---     `type_id` int NOT NULL,
---     `size` bigint NOT NULL,
---     `upload_by` int NOT NULL,
---     UNIQUE (id),
---     PRIMARY KEY (id)
--- );
 
 CREATE TABLE `organizations` (
     `id` int NOT NULL AUTO_INCREMENT,
@@ -77,20 +57,19 @@ CREATE TABLE `items` (
     PRIMARY KEY (id)
 );
 
--- NOTE(rob): deprecated, files attached directly to Items
--- CREATE TABLE `entities` (
---     `id` int NOT NULL AUTO_INCREMENT,
---     `name` varchar(256) NOT NULL,
---     `desc` varchar(256) NOT NULL,
---     `item_id` int DEFAULT NULL,
---     PRIMARY KEY (id)
--- );
+CREATE TABLE `entities` (
+    `id` int NOT NULL AUTO_INCREMENT,
+    `name` varchar(256),
+    `desc` varchar(4096) NOT NULL,
+    `item_id` int DEFAULT NULL
+)
 
 CREATE TABLE `files` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `name` varchar(256) NOT NULL,
   `desc` varchar(4096) NOT NULL,
-  `item_id` int(11) DEFAULT NULL,
+  `entity_id` int(11) DEFAULT NULL,
+  `filename` varchar(45) DEFAULT NULL,
   `md5` varchar(45) DEFAULT NULL,
   `size` int(11) DEFAULT NULL,
   `ext` varchar(45) DEFAULT NULL,
@@ -124,14 +103,13 @@ CREATE TABLE `metadata_fields` (
     `tag` varchar(128) NOT NULL,
     `note` varchar (4096),
     `required` tinyint NOT NULL,
-    `scope` varchar(45),
-    `media_type` varchar(45),
+    `org_id` int DEFAULT NULL,
+    `collection_id` int DEFAULT NULL,
     PRIMARY KEY (id)
 );
 
 CREATE TABLE `metadata_values` (
     `id` int NOT NULL AUTO_INCREMENT,
-    `deposit_id` varchar(50) NOT NULL,
     `file_id` varchar(50),
     `metadata_id` int NOT NULL,
     `value` varchar(4096),

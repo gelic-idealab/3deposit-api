@@ -108,21 +108,21 @@ type Item struct {
 	// Metadata []Metadata `json:"metadata"`
 }
 
-// NOTE(rob): deprecated, file attached directly to Items.
 // Grouping for all sub-item entities
-// type Entity struct {
-// 	ID   string `json:"id"`
-// 	Name string `json:"name"`
-// 	Desc string `json:"desc"`
-// 	// Metadata []Metadata `json:"metadata"`
-// }
+type Entity struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Desc string `json:"desc"`
+	Item Item   `json:"item"`
+	// Metadata []Metadata `json:"metadata"`
+}
 
 // Literal file records
 type File struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
 	Desc     string `json:"desc"`
-	Item     Item   `json:"item"`
+	Entity   Entity `json:"entity"`
 	Filename string `json:"filename"`
 	MD5      string `json:"md5"`
 	Size     int    `json:"size"`
@@ -130,27 +130,29 @@ type File struct {
 	// Metadata []Metadata `json:"metadata"`
 }
 
+// DEPRECATED
 // Deposit data representation of deposit values in db
-type Deposit struct {
-	ID       string          `json:"id"`
-	Name     string          `json:"name"`
-	Desc     string          `json:"desc"`
-	Updated  string          `json:"updated"`
-	Type     string          `json:"type"`
-	Size     int64           `json:"size"`
-	Items    []DepositItem   `json:"items"`
-	Creator  User            `json:"creator"`
-	Events   []DepositEvent  `json:"events"`
-	Metadata []MetadataField `json:"metadata"`
-}
+// type Deposit struct {
+// 	ID       string          `json:"id"`
+// 	Name     string          `json:"name"`
+// 	Desc     string          `json:"desc"`
+// 	Updated  string          `json:"updated"`
+// 	Type     string          `json:"type"`
+// 	Size     int64           `json:"size"`
+// 	Items    []DepositItem   `json:"items"`
+// 	Creator  User            `json:"creator"`
+// 	Events   []DepositEvent  `json:"events"`
+// 	Metadata []MetadataField `json:"metadata"`
+// }
 
+// DEPRECATED
 // DepositItem is a single item of a deposit, usually a file.
-type DepositItem struct {
-	Name    string `json:"name"`
-	Ext     string `json:"ext"`
-	Size    int64  `json:"size"`
-	Updated string `json:"updated"`
-}
+// type DepositItem struct {
+// 	Name    string `json:"name"`
+// 	Ext     string `json:"ext"`
+// 	Size    int64  `json:"size"`
+// 	Updated string `json:"updated"`
+// }
 
 // DepositEvent is an atomic event relating to an existing deposit, such as updating a metadata field value.
 type DepositEvent struct {
@@ -165,16 +167,16 @@ type DepositEvent struct {
 
 // MetadataField keeps information about a metadata field, including the value
 type MetadataField struct {
-	ID        int           `json:"id"`
-	Label     string        `json:"label"`
-	Schema    string        `json:"schema"`
-	Tag       string        `json:"tag"`
-	Note      string        `json:"note"`
-	Required  bool          `json:"required"`
-	Scope     string        `json:"scope"`
-	MediaType string        `json:"mediaType"`
-	Value     MetadataValue `json:"value"`
-	Vocab     []string      `json:"vocab"`
+	ID           int           `json:"id"`
+	Label        string        `json:"label"`
+	Schema       string        `json:"schema"`
+	Tag          string        `json:"tag"`
+	Note         string        `json:"note"`
+	Required     bool          `json:"required"`
+	OrgID        int           `json:"org_id"`
+	CollectionID int           `json:"collection_id"`
+	Value        MetadataValue `json:"value"`
+	Vocab        []string      `json:"vocab"`
 }
 
 // MetadataValue tracks specific values relating to a metadata field, with a reference to the field id
@@ -709,268 +711,269 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func depositsHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println(r.Method, r.RequestURI, r.RemoteAddr)
-	w.Header().Set("Access-Control-Allow-Origin", origin)
-	w.Header().Set("Access-Control-Allow-Headers", "X-API-KEY")
-	w.Header().Set("Access-Control-Allow-Methods", "DELETE")
+// DEPRECATED
+// func depositsHandler(w http.ResponseWriter, r *http.Request) {
+// 	log.Println(r.Method, r.RequestURI, r.RemoteAddr)
+// 	w.Header().Set("Access-Control-Allow-Origin", origin)
+// 	w.Header().Set("Access-Control-Allow-Headers", "X-API-KEY")
+// 	w.Header().Set("Access-Control-Allow-Methods", "DELETE")
 
-	if r.Method == "OPTIONS" {
-		return
-	}
+// 	if r.Method == "OPTIONS" {
+// 		return
+// 	}
 
-	token := r.Header.Get("X-API-KEY")
-	user, err := userHasPermissions(token, userRoleUser)
-	if err != nil {
-		log.Println(err)
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprint(w, "Database error.")
-	}
-	if user.RoleID == 0 {
-		w.WriteHeader(http.StatusUnauthorized)
-		fmt.Fprint(w, "User not permitted.")
-		return
-	}
+// 	token := r.Header.Get("X-API-KEY")
+// 	user, err := userHasPermissions(token, userRoleUser)
+// 	if err != nil {
+// 		log.Println(err)
+// 		w.WriteHeader(http.StatusInternalServerError)
+// 		fmt.Fprint(w, "Database error.")
+// 	}
+// 	if user.RoleID == 0 {
+// 		w.WriteHeader(http.StatusUnauthorized)
+// 		fmt.Fprint(w, "User not permitted.")
+// 		return
+// 	}
 
-	// if r.Method == "POST" {
-	// 	err := r.ParseMultipartForm(10 << maxUploadSizeMB) // maxUploadSizeMB will be held in memory, the rest of the form data will go to disk.
-	// 	if err != nil {
-	// 		log.Println(err)
-	// 		fmt.Fprintln(w, err)
-	// 		return
-	// 	}
+// 	// if r.Method == "POST" {
+// 	// 	err := r.ParseMultipartForm(10 << maxUploadSizeMB) // maxUploadSizeMB will be held in memory, the rest of the form data will go to disk.
+// 	// 	if err != nil {
+// 	// 		log.Println(err)
+// 	// 		fmt.Fprintln(w, err)
+// 	// 		return
+// 	// 	}
 
-	// 	formdata := r.MultipartForm
-	// 	fmt.Println(formdata)
-	//  }
+// 	// 	formdata := r.MultipartForm
+// 	// 	fmt.Println(formdata)
+// 	//  }
 
-	if r.Method == "GET" {
-		// get specific deposit data if id query
-		depositID := r.URL.Query().Get("id")
-		if len(depositID) > 0 {
-			rows, err := db.Query(
-				`SELECT
-					d.id,
-					d.name,
-					d.desc,
-					d.updated,
-					dt.type,
-					d.size,
-					u.id,
-					u.email,
-					u.first_name,
-					u.last_name
-				FROM deposits d
-				JOIN deposit_types dt on d.type_id = dt.id
-				JOIN users u on u.id = d.upload_by
-				WHERE d.id = ?;`,
-				depositID)
-			if err != nil {
-				log.Println(err)
-				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Fprint(w, "Database error.")
-				return
-			}
-			deposit := Deposit{}
-			for rows.Next() {
-				err := rows.Scan(
-					&deposit.ID,
-					&deposit.Name,
-					&deposit.Desc,
-					&deposit.Updated,
-					&deposit.Type,
-					&deposit.Size,
-					&deposit.Creator.ID,
-					&deposit.Creator.Email,
-					&deposit.Creator.First,
-					&deposit.Creator.Last,
-				)
-				if err != nil {
-					log.Println(err)
-					w.WriteHeader(http.StatusInternalServerError)
-					return
-				}
-			}
+// 	if r.Method == "GET" {
+// 		// get specific deposit data if id query
+// 		depositID := r.URL.Query().Get("id")
+// 		if len(depositID) > 0 {
+// 			rows, err := db.Query(
+// 				`SELECT
+// 					d.id,
+// 					d.name,
+// 					d.desc,
+// 					d.updated,
+// 					dt.type,
+// 					d.size,
+// 					u.id,
+// 					u.email,
+// 					u.first_name,
+// 					u.last_name
+// 				FROM deposits d
+// 				JOIN deposit_types dt on d.type_id = dt.id
+// 				JOIN users u on u.id = d.upload_by
+// 				WHERE d.id = ?;`,
+// 				depositID)
+// 			if err != nil {
+// 				log.Println(err)
+// 				w.WriteHeader(http.StatusInternalServerError)
+// 				fmt.Fprint(w, "Database error.")
+// 				return
+// 			}
+// 			deposit := Deposit{}
+// 			for rows.Next() {
+// 				err := rows.Scan(
+// 					&deposit.ID,
+// 					&deposit.Name,
+// 					&deposit.Desc,
+// 					&deposit.Updated,
+// 					&deposit.Type,
+// 					&deposit.Size,
+// 					&deposit.Creator.ID,
+// 					&deposit.Creator.Email,
+// 					&deposit.Creator.First,
+// 					&deposit.Creator.Last,
+// 				)
+// 				if err != nil {
+// 					log.Println(err)
+// 					w.WriteHeader(http.StatusInternalServerError)
+// 					return
+// 				}
+// 			}
 
-			// Get deposit events
-			rows, err = db.Query(
-				`SELECT 
-					id, 
-					user_id, 
-					deposit_id, 
-					event_scope,
-					event_target,
-					event_type, 
-					event_timestamp 
-				FROM events 
-				WHERE deposit_id = ?`,
-				deposit.ID,
-			)
-			if err != nil {
-				log.Println(err)
-				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Fprint(w, "Database error.")
-				return
-			}
-			events := []DepositEvent{}
-			for rows.Next() {
-				de := DepositEvent{}
-				err := rows.Scan(
-					&de.ID,
-					&de.User,
-					&de.DepositID,
-					&de.Scope,
-					&de.Target,
-					&de.Type,
-					&de.Time,
-				)
-				if err != nil {
-					log.Println(err)
-					w.WriteHeader(http.StatusInternalServerError)
-					return
-				}
-				events = append(events, de)
-			}
+// 			// Get deposit events
+// 			rows, err = db.Query(
+// 				`SELECT
+// 					id,
+// 					user_id,
+// 					deposit_id,
+// 					event_scope,
+// 					event_target,
+// 					event_type,
+// 					event_timestamp
+// 				FROM events
+// 				WHERE deposit_id = ?`,
+// 				deposit.ID,
+// 			)
+// 			if err != nil {
+// 				log.Println(err)
+// 				w.WriteHeader(http.StatusInternalServerError)
+// 				fmt.Fprint(w, "Database error.")
+// 				return
+// 			}
+// 			events := []DepositEvent{}
+// 			for rows.Next() {
+// 				de := DepositEvent{}
+// 				err := rows.Scan(
+// 					&de.ID,
+// 					&de.User,
+// 					&de.DepositID,
+// 					&de.Scope,
+// 					&de.Target,
+// 					&de.Type,
+// 					&de.Time,
+// 				)
+// 				if err != nil {
+// 					log.Println(err)
+// 					w.WriteHeader(http.StatusInternalServerError)
+// 					return
+// 				}
+// 				events = append(events, de)
+// 			}
 
-			deposit.Events = events
+// 			deposit.Events = events
 
-			// Get deposit metadata values
-			// Query selects all required fields, or any fields that have metadata values
-			rows, err = db.Query(
-				`SELECT
-					f.id, 
-					f.label, 
-					f.schema, 
-					f.tag, 
-					f.note, 
-					f.required, 
-					IFNULL(v.id, 0), 
-					IFNULL(v.deposit_id, 0), 
-					IFNULL(v.metadata_id, 0), 
-					IFNULL(v.value, ""), 
-					IFNULL(v.updated, 0), 
-					IFNULL(v.updated_by, 0)
-				FROM metadata_fields f
-				LEFT JOIN metadata_values v
-				ON (v.metadata_id = f.id AND v.deposit_id = ?)
-				WHERE (f.required = 1 OR v.value IS NOT NULL);`,
-				deposit.ID,
-			)
-			if err != nil {
-				log.Println(err)
-				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Fprint(w, "Database error.")
-				return
-			}
-			metadata := []MetadataField{}
-			for rows.Next() {
-				val := MetadataField{}
-				err := rows.Scan(
-					&val.ID,
-					&val.Label,
-					&val.Schema,
-					&val.Tag,
-					&val.Note,
-					&val.Required,
-					&val.Value.ID,
-					&val.Value.DepositID,
-					&val.Value.MetadataID,
-					&val.Value.Value,
-					&val.Value.Updated,
-					&val.Value.UpdatedBy,
-				)
-				if err != nil {
-					log.Println(err)
-					w.WriteHeader(http.StatusInternalServerError)
-					return
-				}
-				metadata = append(metadata, val)
-			}
+// 			// Get deposit metadata values
+// 			// Query selects all required fields, or any fields that have metadata values
+// 			rows, err = db.Query(
+// 				`SELECT
+// 					f.id,
+// 					f.label,
+// 					f.schema,
+// 					f.tag,
+// 					f.note,
+// 					f.required,
+// 					IFNULL(v.id, 0),
+// 					IFNULL(v.deposit_id, 0),
+// 					IFNULL(v.metadata_id, 0),
+// 					IFNULL(v.value, ""),
+// 					IFNULL(v.updated, 0),
+// 					IFNULL(v.updated_by, 0)
+// 				FROM metadata_fields f
+// 				LEFT JOIN metadata_values v
+// 				ON (v.metadata_id = f.id AND v.deposit_id = ?)
+// 				WHERE (f.required = 1 OR v.value IS NOT NULL);`,
+// 				deposit.ID,
+// 			)
+// 			if err != nil {
+// 				log.Println(err)
+// 				w.WriteHeader(http.StatusInternalServerError)
+// 				fmt.Fprint(w, "Database error.")
+// 				return
+// 			}
+// 			metadata := []MetadataField{}
+// 			for rows.Next() {
+// 				val := MetadataField{}
+// 				err := rows.Scan(
+// 					&val.ID,
+// 					&val.Label,
+// 					&val.Schema,
+// 					&val.Tag,
+// 					&val.Note,
+// 					&val.Required,
+// 					&val.Value.ID,
+// 					&val.Value.DepositID,
+// 					&val.Value.MetadataID,
+// 					&val.Value.Value,
+// 					&val.Value.Updated,
+// 					&val.Value.UpdatedBy,
+// 				)
+// 				if err != nil {
+// 					log.Println(err)
+// 					w.WriteHeader(http.StatusInternalServerError)
+// 					return
+// 				}
+// 				metadata = append(metadata, val)
+// 			}
 
-			deposit.Metadata = metadata
+// 			deposit.Metadata = metadata
 
-			// construct deposit file tree
-			for object := range minioClient.ListObjects(context.Background(), defaultBucketName, minio.ListObjectsOptions{Prefix: depositID, Recursive: true}) {
-				item := DepositItem{}
-				splits := strings.Split(object.Key, "/")
-				item.Name = strings.Join(splits[1:], "/")
-				splits = strings.Split(object.Key, ".")
-				item.Ext = splits[len(splits)-1]
-				item.Size = object.Size
-				item.Updated = object.LastModified.String()
-				deposit.Items = append(deposit.Items, item)
-			}
+// 			// construct deposit file tree
+// 			for object := range minioClient.ListObjects(context.Background(), defaultBucketName, minio.ListObjectsOptions{Prefix: depositID, Recursive: true}) {
+// 				item := DepositItem{}
+// 				splits := strings.Split(object.Key, "/")
+// 				item.Name = strings.Join(splits[1:], "/")
+// 				splits = strings.Split(object.Key, ".")
+// 				item.Ext = splits[len(splits)-1]
+// 				item.Size = object.Size
+// 				item.Updated = object.LastModified.String()
+// 				deposit.Items = append(deposit.Items, item)
+// 			}
 
-			// construct deposits data payload
-			depositJSON, err := json.Marshal(deposit)
-			if err != nil {
-				log.Println("Error encoding deposit data", err)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			fmt.Fprint(w, string(depositJSON))
-			return
-		}
+// 			// construct deposits data payload
+// 			depositJSON, err := json.Marshal(deposit)
+// 			if err != nil {
+// 				log.Println("Error encoding deposit data", err)
+// 				w.WriteHeader(http.StatusInternalServerError)
+// 				return
+// 			}
+// 			fmt.Fprint(w, string(depositJSON))
+// 			return
+// 		}
 
-		// else get all deposits data
-		rows, err := db.Query(
-			`SELECT
-				d.id,
-				d.name,
-				d.desc,
-				d.updated,
-				dt.type,
-				d.size,
-				u.id,
-				u.email,
-				u.first_name,
-				u.last_name
-			FROM deposits d
-			JOIN deposit_types dt on d.type_id = dt.id
-			JOIN users u on u.id = d.upload_by;`,
-		)
-		if err != nil {
-			log.Println(err)
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprint(w, "Database error.")
-			return
-		}
-		deposits := []Deposit{}
-		for rows.Next() {
-			deposit := Deposit{}
-			err := rows.Scan(
-				&deposit.ID,
-				&deposit.Name,
-				&deposit.Desc,
-				&deposit.Updated,
-				&deposit.Type,
-				&deposit.Size,
-				&deposit.Creator.ID,
-				&deposit.Creator.Email,
-				&deposit.Creator.First,
-				&deposit.Creator.Last,
-			)
-			if err != nil {
-				log.Println(err)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			deposits = append(deposits, deposit)
-		}
-		// construct deposits data payload
-		depositsJSON, err := json.Marshal(deposits)
-		if err != nil {
-			log.Println("Error encoding deposits data", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		fmt.Fprint(w, string(depositsJSON))
-		return
-	}
+// 		// else get all deposits data
+// 		rows, err := db.Query(
+// 			`SELECT
+// 				d.id,
+// 				d.name,
+// 				d.desc,
+// 				d.updated,
+// 				dt.type,
+// 				d.size,
+// 				u.id,
+// 				u.email,
+// 				u.first_name,
+// 				u.last_name
+// 			FROM deposits d
+// 			JOIN deposit_types dt on d.type_id = dt.id
+// 			JOIN users u on u.id = d.upload_by;`,
+// 		)
+// 		if err != nil {
+// 			log.Println(err)
+// 			w.WriteHeader(http.StatusInternalServerError)
+// 			fmt.Fprint(w, "Database error.")
+// 			return
+// 		}
+// 		deposits := []Deposit{}
+// 		for rows.Next() {
+// 			deposit := Deposit{}
+// 			err := rows.Scan(
+// 				&deposit.ID,
+// 				&deposit.Name,
+// 				&deposit.Desc,
+// 				&deposit.Updated,
+// 				&deposit.Type,
+// 				&deposit.Size,
+// 				&deposit.Creator.ID,
+// 				&deposit.Creator.Email,
+// 				&deposit.Creator.First,
+// 				&deposit.Creator.Last,
+// 			)
+// 			if err != nil {
+// 				log.Println(err)
+// 				w.WriteHeader(http.StatusInternalServerError)
+// 				return
+// 			}
+// 			deposits = append(deposits, deposit)
+// 		}
+// 		// construct deposits data payload
+// 		depositsJSON, err := json.Marshal(deposits)
+// 		if err != nil {
+// 			log.Println("Error encoding deposits data", err)
+// 			w.WriteHeader(http.StatusInternalServerError)
+// 			return
+// 		}
+// 		fmt.Fprint(w, string(depositsJSON))
+// 		return
+// 	}
 
-	// unhandled method
-	fmt.Fprintln(w, "No handler for method:", r.Method)
-}
+// 	// unhandled method
+// 	fmt.Fprintln(w, "No handler for method:", r.Method)
+// }
 
 func downloadHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println(r.Method, r.RequestURI, r.RemoteAddr)
@@ -1601,22 +1604,27 @@ func filesHandler(w http.ResponseWriter, r *http.Request) {
 		if user.RoleID == 1 {
 			// return everything if user is admin.
 			rows, err = db.Query(`SELECT 
-									f.id, f.name, f.desc, f.filename, f.md5, f.size, f.ext, 
+									f.id, f.name, f.desc, f.filename, f.md5, f.size, f.ext,
+									e.id, e.name, e.desc, 
 									i.id, i.name, i.desc, 
 									c.id, c.name, c.desc,
 									o.id, o.name, o.desc
-								FROM files f 
+								FROM files f
+								JOIN entities e ON e.id = f.entity_id
 								JOIN items i ON i.id = f.item_id 
 								JOIN collections c ON i.collection_id = c.id
 								JOIN organizations o on c.org_id = o.id;`)
 		} else {
 			// only return items where user is member or owner of collection.
 			rows, err = db.Query(`SELECT 
-									f.id, f.name, f.desc, f.filename, f.md5, f.size, f.ext, 
+									f.id, f.name, f.desc, f.filename, f.md5, f.size, f.ext,
+									e.id, e.name, e.desc, 
 									i.id, i.name, i.desc, 
 									c.id, c.name, c.desc,
 									o.id, o.name, o.desc
-									FROM files f JOIN items i ON i.id = f.item_id 
+									FROM files f
+									JOIN entities e ON e.id = f.entity_id
+									JOIN items i ON i.id = e.item_id 
 									JOIN collections c ON i.collection_id = c.id
 									JOIN organization o ON c.org_id = o.id
 									JOIN members m ON m.user_id = ? 
@@ -1632,9 +1640,10 @@ func filesHandler(w http.ResponseWriter, r *http.Request) {
 		for rows.Next() {
 			file := File{}
 			err := rows.Scan(&file.ID, &file.Name, &file.Desc, &file.Filename, &file.MD5, &file.Size, &file.Ext,
-				&file.Item.ID, &file.Item.Name, &file.Item.Desc,
-				&file.Item.Collection.ID, &file.Item.Collection.Name, &file.Item.Collection.Desc,
-				&file.Item.Collection.Org.ID, &file.Item.Collection.Org.Name, &file.Item.Collection.Org.Desc)
+				&file.Entity.ID, &file.Entity.Name, &file.Entity.Desc,
+				&file.Entity.Item.ID, &file.Entity.Item.Name, &file.Entity.Item.Desc,
+				&file.Entity.Item.Collection.ID, &file.Entity.Item.Collection.Name, &file.Entity.Item.Collection.Desc,
+				&file.Entity.Item.Collection.Org.ID, &file.Entity.Item.Collection.Org.Name, &file.Entity.Item.Collection.Org.Desc)
 			if err != nil {
 				log.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
@@ -1668,12 +1677,18 @@ func filesHandler(w http.ResponseWriter, r *http.Request) {
 		id, _ := strconv.ParseInt(r.FormValue("id"), 10, 64)
 		name := r.FormValue("name")
 		desc := r.FormValue("desc")
-		item := r.FormValue("item")
+		entity := r.FormValue("entity")
+		item := ""
 		col := ""
 		org := ""
 
 		// get item info
-		rows, err := db.Query(`SELECT c.id, o.id FROM items i JOIN collections c ON i.collection_id = c.id JOIN organizations o ON c.org_id = o.id;`)
+		rows, err := db.Query(`SELECT i.id, c.id, o.id 
+							   FROM entities e 
+							   JOIN items i ON e.item_id = i.id 
+							   JOIN collections c ON i.collection_id = c.id 
+							   JOIN organizations o ON c.org_id = o.id
+							   WHERE e.id = ?;`, entity)
 		if err != nil {
 			log.Println(err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -1681,7 +1696,7 @@ func filesHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		for rows.Next() {
-			err := rows.Scan(&col, &org)
+			err := rows.Scan(&item, &col, &org)
 			if err != nil {
 				log.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
@@ -1704,7 +1719,7 @@ func filesHandler(w http.ResponseWriter, r *http.Request) {
 
 		// construct object "path"
 		// TODO(rob): generate guid for object "name", instead of using filename.
-		pathElements := []string{org, col, item, file.Filename}
+		pathElements := []string{org, col, item, entity, file.Filename}
 		objectName := strings.Join(pathElements, "/")
 
 		// put object into default bucket
@@ -2042,7 +2057,6 @@ func main() {
 	// route handlers
 	http.HandleFunc("/", dashboardHandler)
 	http.HandleFunc("/deposit/metadata", depositMetadataHandler)
-	http.HandleFunc("/deposits", depositsHandler)
 	http.HandleFunc("/download", downloadHandler)
 	http.HandleFunc("/login", loginHandler)
 	http.HandleFunc("/metadata", metadataHandler)
