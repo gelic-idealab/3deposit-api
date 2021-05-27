@@ -9,7 +9,7 @@ services:
             - 3306:3306
         restart: always
         env_file:
-            - ../prod.env
+            - ../dev.env
         volumes:
             - ../sql:/docker-entrypoint-initdb.d
         networks:
@@ -28,7 +28,7 @@ services:
         volumes:
             - ./minio/data:/data
         env_file:
-            - ../prod.env
+            - ../dev.env
         command: server /data
         restart: always
         networks:
