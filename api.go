@@ -549,144 +549,144 @@ func dashboardHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func uploadHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println(r.Method, r.RequestURI, r.RemoteAddr)
-	w.Header().Set("Access-Control-Allow-Origin", origin)
-	w.Header().Set("Access-Control-Allow-Headers", "X-API-KEY")
-	w.Header().Set("Access-Control-Allow-Methods", "DELETE")
+// func uploadHandler(w http.ResponseWriter, r *http.Request) {
+// 	log.Println(r.Method, r.RequestURI, r.RemoteAddr)
+// 	w.Header().Set("Access-Control-Allow-Origin", origin)
+// 	w.Header().Set("Access-Control-Allow-Headers", "X-API-KEY")
+// 	w.Header().Set("Access-Control-Allow-Methods", "DELETE")
 
-	if r.Method == "OPTIONS" {
-		return
-	}
+// 	if r.Method == "OPTIONS" {
+// 		return
+// 	}
 
-	token := r.Header.Get("X-API-KEY")
-	user, err := userHasPermissions(token, userRoleUser)
-	if err != nil {
-		log.Println(err)
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprint(w, "Database error.")
-	}
-	if user.RoleID == 0 {
-		w.WriteHeader(http.StatusUnauthorized)
-		fmt.Fprint(w, "User not permitted.")
-		return
-	}
+// 	token := r.Header.Get("X-API-KEY")
+// 	user, err := userHasPermissions(token, userRoleUser)
+// 	if err != nil {
+// 		log.Println(err)
+// 		w.WriteHeader(http.StatusInternalServerError)
+// 		fmt.Fprint(w, "Database error.")
+// 	}
+// 	if user.RoleID == 0 {
+// 		w.WriteHeader(http.StatusUnauthorized)
+// 		fmt.Fprint(w, "User not permitted.")
+// 		return
+// 	}
 
-	if r.Method == "POST" {
-		err := r.ParseMultipartForm(10 << maxUploadSizeMB) // maxUploadSizeMB will be held in memory, the rest of the form data will go to disk.
-		if err != nil {
-			fmt.Fprintln(w, err)
-			return
-		}
+// 	if r.Method == "POST" {
+// 		err := r.ParseMultipartForm(10 << maxUploadSizeMB) // maxUploadSizeMB will be held in memory, the rest of the form data will go to disk.
+// 		if err != nil {
+// 			fmt.Fprintln(w, err)
+// 			return
+// 		}
 
-		// Unpack and store form data
-		formdata := r.MultipartForm
-		files := formdata.File["file"]
+// 		// Unpack and store form data
+// 		formdata := r.MultipartForm
+// 		files := formdata.File["file"]
 
-		depositID := uuid.New().String()
-		depositName := r.FormValue("deposit_name")
-		depositDesc := r.FormValue("deposit_desc")
-		dt := r.FormValue("deposit_type")
-		depositType := 0
-		switch dt {
-		case "model":
-			depositType = 1
-		case "video":
-			depositType = 2
-		case "vr":
-			depositType = 3
-		}
+// 		depositID := uuid.New().String()
+// 		depositName := r.FormValue("deposit_name")
+// 		depositDesc := r.FormValue("deposit_desc")
+// 		dt := r.FormValue("deposit_type")
+// 		depositType := 0
+// 		switch dt {
+// 		case "model":
+// 			depositType = 1
+// 		case "video":
+// 			depositType = 2
+// 		case "vr":
+// 			depositType = 3
+// 		}
 
-		var depositSize int64
-		for i := range files {
-			filename := files[i].Filename
-			log.Println("Processing file:", filename)
+// 		var depositSize int64
+// 		for i := range files {
+// 			filename := files[i].Filename
+// 			log.Println("Processing file:", filename)
 
-			size := files[i].Size
-			depositSize += size
+// 			size := files[i].Size
+// 			depositSize += size
 
-			file, err := files[i].Open()
-			if err != nil {
-				fmt.Fprintln(w, err)
-				return
-			}
-			defer file.Close()
+// 			file, err := files[i].Open()
+// 			if err != nil {
+// 				fmt.Fprintln(w, err)
+// 				return
+// 			}
+// 			defer file.Close()
 
-			// put object into default bucket
-			info, err := minioClient.PutObject(context.Background(), defaultBucketName, depositID+"/"+filename, file, size, minio.PutObjectOptions{})
-			if err != nil {
-				log.Println(err)
-				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Fprint(w, "Storage error.")
-				return
-			}
-			log.Println("Successfully put object:", info)
+// 			// put object into default bucket
+// 			info, err := minioClient.PutObject(context.Background(), defaultBucketName, depositID+"/"+filename, file, size, minio.PutObjectOptions{})
+// 			if err != nil {
+// 				log.Println(err)
+// 				w.WriteHeader(http.StatusInternalServerError)
+// 				fmt.Fprint(w, "Storage error.")
+// 				return
+// 			}
+// 			log.Println("Successfully put object:", info)
 
-			// genereate boilerplate metadata xml file
-			// see: https://golang.org/src/encoding/xml/example_test.go
-			// cmd := exec.Command("python", "./premis/generate.py", "fileID", filename)
-			// cmd.Stdout = os.Stdout
-			// cmd.Stderr = os.Stderr
-			// log.Println(cmd.Run())
-		}
+// 			// genereate boilerplate metadata xml file
+// 			// see: https://golang.org/src/encoding/xml/example_test.go
+// 			// cmd := exec.Command("python", "./premis/generate.py", "fileID", filename)
+// 			// cmd.Stdout = os.Stdout
+// 			// cmd.Stderr = os.Stderr
+// 			// log.Println(cmd.Run())
+// 		}
 
-		// write deposit record
-		_, err = db.Exec(
-			`INSERT INTO deposits VALUES (?, ?, ?, ?, ?, ?, ?);`,
-			depositID, depositName, depositDesc, time.Now(), depositType, depositSize, user.ID)
-		if err != nil {
-			log.Println(err)
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprint(w, "Database error.")
-			return
-		}
+// 		// write deposit record
+// 		_, err = db.Exec(
+// 			`INSERT INTO deposits VALUES (?, ?, ?, ?, ?, ?, ?);`,
+// 			depositID, depositName, depositDesc, time.Now(), depositType, depositSize, user.ID)
+// 		if err != nil {
+// 			log.Println(err)
+// 			w.WriteHeader(http.StatusInternalServerError)
+// 			fmt.Fprint(w, "Database error.")
+// 			return
+// 		}
 
-		for field := range formdata.Value {
-			if field != "deposit_name" && field != "deposit_desc" && field != "deposit_type" {
-				mf := MetadataField{}
-				json.Unmarshal([]byte(r.FormValue(field)), &mf)
+// 		for field := range formdata.Value {
+// 			if field != "deposit_name" && field != "deposit_desc" && field != "deposit_type" {
+// 				mf := MetadataField{}
+// 				json.Unmarshal([]byte(r.FormValue(field)), &mf)
 
-				// write metadata records
-				_, err = db.Exec(
-					`INSERT INTO metadata_values (deposit_id, metadata_id, value, updated, updated_by) VALUES (?, ?, ?, ?, ?);`,
-					depositID, mf.ID, mf.Value.Value, time.Now(), user.ID)
-				if err != nil {
-					log.Println(err)
-					w.WriteHeader(http.StatusInternalServerError)
-					fmt.Fprint(w, "Database error.")
-					return
-				}
+// 				// write metadata records
+// 				_, err = db.Exec(
+// 					`INSERT INTO metadata_values (deposit_id, metadata_id, value, updated, updated_by) VALUES (?, ?, ?, ?, ?);`,
+// 					depositID, mf.ID, mf.Value.Value, time.Now(), user.ID)
+// 				if err != nil {
+// 					log.Println(err)
+// 					w.WriteHeader(http.StatusInternalServerError)
+// 					fmt.Fprint(w, "Database error.")
+// 					return
+// 				}
 
-				// write event record
-				_, err = db.Exec(
-					`INSERT INTO events 
-						(user_id, deposit_id, event_scope, event_target, event_type, event_timestamp) 
-					VALUES (?, ?, ?, ?, ?, ?);`,
-					user.ID, depositID, "metadata", mf.ID, "create", time.Now())
-				if err != nil {
-					log.Println(err)
-					w.WriteHeader(http.StatusInternalServerError)
-					fmt.Fprint(w, "Database error.")
-					return
-				}
-			}
-		}
+// 				// write event record
+// 				_, err = db.Exec(
+// 					`INSERT INTO events
+// 						(user_id, deposit_id, event_scope, event_target, event_type, event_timestamp)
+// 					VALUES (?, ?, ?, ?, ?, ?);`,
+// 					user.ID, depositID, "metadata", mf.ID, "create", time.Now())
+// 				if err != nil {
+// 					log.Println(err)
+// 					w.WriteHeader(http.StatusInternalServerError)
+// 					fmt.Fprint(w, "Database error.")
+// 					return
+// 				}
+// 			}
+// 		}
 
-		// genereate boilerplate metadata xml file
-		// see: https://golang.org/src/encoding/xml/example_test.go
-		// cmd := exec.Command("python", "./premis/generate.py", "depositID", depositID)
-		// cmd.Stdout = os.Stdout
-		// cmd.Stderr = os.Stderr
-		// log.Println(cmd.Run())
+// 		// genereate boilerplate metadata xml file
+// 		// see: https://golang.org/src/encoding/xml/example_test.go
+// 		// cmd := exec.Command("python", "./premis/generate.py", "depositID", depositID)
+// 		// cmd.Stdout = os.Stdout
+// 		// cmd.Stderr = os.Stderr
+// 		// log.Println(cmd.Run())
 
-		fmt.Fprintf(w, "Deposit uploaded successfully: "+depositName)
-		return
-	}
+// 		fmt.Fprintf(w, "Deposit uploaded successfully: "+depositName)
+// 		return
+// 	}
 
-	// unhandled method
-	fmt.Fprintln(w, "No handler for method:", r.Method)
+// 	// unhandled method
+// 	fmt.Fprintln(w, "No handler for method:", r.Method)
 
-}
+// }
 
 // DEPRECATED
 // func depositsHandler(w http.ResponseWriter, r *http.Request) {
@@ -953,6 +953,9 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 // }
 
 func downloadHandler(w http.ResponseWriter, r *http.Request) {
+
+	// TODO(rob): use new object path format from filesHandler POST
+
 	log.Println(r.Method, r.RequestURI, r.RemoteAddr)
 	w.Header().Set("Access-Control-Allow-Origin", origin)
 
@@ -1439,10 +1442,24 @@ func itemsHandler(w http.ResponseWriter, r *http.Request) {
 		var err error
 		if user.RoleID == 1 {
 			// return everything if user is admin.
-			rows, err = db.Query(`SELECT i.id, i.name, i.desc, c.id, c.name, c.desc FROM items i JOIN collections c ON i.collection_id = c.id;`)
+			rows, err = db.Query(`SELECT 
+									i.id, i.name, i.desc, 
+									c.id, c.name, c.desc,
+									o.id, o.name, o.desc
+									FROM items i 
+									JOIN collections c ON i.collection_id = c.id
+									JOIN organizations o ON c.org_id = o.id;`)
 		} else {
 			// only return items where user is member or owner of collection.
-			rows, err = db.Query(`SELECT i.id, i.name, i.desc, c.id, c.name, c.desc FROM items i JOIN collections c ON i.collection_id = c.id JOIN members m ON m.user_id = ? WHERE m.scope = ? AND (m.role = ? OR m.role = ?) ;`, user.ID, SCOPE_COLLECTION, MEMBER_ROLE_MEMBER, MEMBER_ROLE_OWNER)
+			rows, err = db.Query(`SELECT 
+									i.id, i.name, i.desc, 
+									c.id, c.name, c.desc,
+									o.id, o.name, o.desc
+									FROM items i 
+									JOIN collections c ON i.collection_id = c.id
+									JOIN organizations o ON c.org_id = o.id
+									JOIN members m ON m.user_id = ?
+									WHERE m.scope = ? AND (m.role = ? OR m.role = ?) ;`, user.ID, SCOPE_COLLECTION, MEMBER_ROLE_MEMBER, MEMBER_ROLE_OWNER)
 		}
 		if err != nil {
 			log.Println(err)
@@ -1453,7 +1470,10 @@ func itemsHandler(w http.ResponseWriter, r *http.Request) {
 		items := []Item{}
 		for rows.Next() {
 			item := Item{}
-			err := rows.Scan(&item.ID, &item.Name, &item.Desc, &item.Collection.ID, &item.Collection.Name, &item.Collection.Desc)
+			err := rows.Scan(
+				&item.ID, &item.Name, &item.Desc,
+				&item.Collection.ID, &item.Collection.Name, &item.Collection.Desc,
+				&item.Collection.Org.ID, &item.Collection.Org.Name, &item.Collection.Org.Desc)
 			if err != nil {
 				log.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
@@ -1580,10 +1600,28 @@ func entitiesHandler(w http.ResponseWriter, r *http.Request) {
 		var err error
 		if user.RoleID == 1 {
 			// return everything if user is admin.
-			rows, err = db.Query(`SELECT e.id, e.name, e.desc, i.id, i.name, i.desc FROM entities e JOIN items i ON e.item_id = i.id;`)
+			rows, err = db.Query(`SELECT 
+									e.id, e.name, e.desc, 
+									i.id, i.name, i.desc,
+									c.id, c.name, c.desc,
+									o.id, o.name, o.desc
+									FROM entities e 
+									JOIN items i ON e.item_id = i.id
+									JOIN collections c ON c.id = i.collection_id
+									JOIN organizations o ON o.id = c.org_id;`)
 		} else {
 			// only return items where user is member or owner of collection.
-			rows, err = db.Query(`SELECT e.id, e.name, e.desc, i.id, i.name, i.desc FROM entities e JOIN items i ON e.item_id = i.id JOIN collections c ON i.collection_id = c.id JOIN members m ON m.user_id = ? WHERE m.scope = ? AND (m.role = ? OR m.role = ?) ;`, user.ID, SCOPE_COLLECTION, MEMBER_ROLE_MEMBER, MEMBER_ROLE_OWNER)
+			rows, err = db.Query(`SELECT 
+									e.id, e.name, e.desc, 
+									i.id, i.name, i.desc,
+									c.id, c.name, c.desc,
+									o.id, o.name, o.desc
+									FROM entities e 
+									JOIN items i ON e.item_id = i.id 
+									JOIN collections c ON i.collection_id = c.id
+									JOIN organizations o ON o.id = c.org_id
+									JOIN members m ON m.user_id = ? 
+									WHERE m.scope = ? AND (m.role = ? OR m.role = ?) ;`, user.ID, SCOPE_COLLECTION, MEMBER_ROLE_MEMBER, MEMBER_ROLE_OWNER)
 		}
 		if err != nil {
 			log.Println(err)
@@ -1594,7 +1632,11 @@ func entitiesHandler(w http.ResponseWriter, r *http.Request) {
 		entities := []Entity{}
 		for rows.Next() {
 			entity := Entity{}
-			err := rows.Scan(&entity.ID, &entity.Name, &entity.Desc, &entity.Item.ID, &entity.Item.Name, &entity.Item.Desc)
+			err := rows.Scan(
+				&entity.ID, &entity.Name, &entity.Desc,
+				&entity.Item.ID, &entity.Item.Name, &entity.Item.Desc,
+				&entity.Item.Collection.ID, &entity.Item.Collection.Name, &entity.Item.Collection.Desc,
+				&entity.Item.Collection.Org.ID, &entity.Item.Collection.Org.Name, &entity.Item.Collection.Org.Desc)
 			if err != nil {
 				log.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
@@ -2178,7 +2220,6 @@ func main() {
 	http.HandleFunc("/download", downloadHandler)
 	http.HandleFunc("/login", loginHandler)
 	http.HandleFunc("/metadata", metadataHandler)
-	http.HandleFunc("/upload", uploadHandler)
 	http.HandleFunc("/users", usersHandler)
 	http.HandleFunc("/orgs", orgsHandler)
 	http.HandleFunc("/collections", collectionsHandler)
