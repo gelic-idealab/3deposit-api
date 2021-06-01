@@ -104,20 +104,21 @@ type Item struct {
 	Name       string     `json:"name"`
 	Desc       string     `json:"desc"`
 	Collection Collection `json:"collection"`
-	Files      []File     `json:"files"`
+	Entities   []Entity   `json:"entities"`
 	// Metadata []Metadata `json:"metadata"`
 }
 
 // Grouping for all sub-item entities
 type Entity struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	Desc string `json:"desc"`
-	Item Item   `json:"item"`
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Desc  string `json:"desc"`
+	Item  Item   `json:"item"`
+	Files []File `json:"files"`
 	// Metadata []Metadata `json:"metadata"`
 }
 
-// Literal file records
+// File record with object metadata
 type File struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
@@ -129,30 +130,6 @@ type File struct {
 	Ext      string `json:"ext"`
 	// Metadata []Metadata `json:"metadata"`
 }
-
-// DEPRECATED
-// Deposit data representation of deposit values in db
-// type Deposit struct {
-// 	ID       string          `json:"id"`
-// 	Name     string          `json:"name"`
-// 	Desc     string          `json:"desc"`
-// 	Updated  string          `json:"updated"`
-// 	Type     string          `json:"type"`
-// 	Size     int64           `json:"size"`
-// 	Items    []DepositItem   `json:"items"`
-// 	Creator  User            `json:"creator"`
-// 	Events   []DepositEvent  `json:"events"`
-// 	Metadata []MetadataField `json:"metadata"`
-// }
-
-// DEPRECATED
-// DepositItem is a single item of a deposit, usually a file.
-// type DepositItem struct {
-// 	Name    string `json:"name"`
-// 	Ext     string `json:"ext"`
-// 	Size    int64  `json:"size"`
-// 	Updated string `json:"updated"`
-// }
 
 // DepositEvent is an atomic event relating to an existing deposit, such as updating a metadata field value.
 type DepositEvent struct {
@@ -1484,22 +1461,22 @@ func itemsHandler(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// construct Files slice using item id
-			fileRows, err := db.Query(`SELECT f.id, f.name, f.desc, f.filename, f.md5, f.size, f.ext FROM files f WHERE f.item_id = ?;`, item.ID)
+			entityRows, err := db.Query(`SELECT e.id, e.name, e.desc FROM entities e WHERE e.item_id = ?;`, item.ID)
 			if err != nil {
 				log.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
 				fmt.Fprint(w, "Database error.")
 				return
 			}
-			for fileRows.Next() {
-				file := File{}
-				err := fileRows.Scan(&file.ID, &file.Name, &file.Desc, &file.Filename, &file.MD5, &file.Size, &file.Ext)
+			for entityRows.Next() {
+				entity := Entity{}
+				err := entityRows.Scan(&entity.ID, &entity.Name, &entity.Desc)
 				if err != nil {
 					log.Println(err)
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
-				item.Files = append(item.Files, file)
+				item.Entities = append(item.Entities, entity)
 			}
 
 			items = append(items, item)
@@ -1508,7 +1485,7 @@ func itemsHandler(w http.ResponseWriter, r *http.Request) {
 		// construct users data payload
 		itemsJSON, err := json.Marshal(items)
 		if err != nil {
-			log.Println("Error encoding collections data", err)
+			log.Println("Error encoding items data", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -1572,6 +1549,147 @@ func itemsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func entitiesHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println(r.Method, r.RequestURI, r.RemoteAddr)
+	w.Header().Set("Access-Control-Allow-Origin", origin)
+	w.Header().Set("Access-Control-Allow-Headers", "X-API-KEY")
+	w.Header().Set("Access-Control-Allow-Methods", "DELETE")
+
+	if r.Method == "OPTIONS" {
+		return
+	}
+
+	token := r.Header.Get("X-API-KEY")
+	user, err := userHasPermissions(token, userRoleUser)
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, "Database error.")
+	}
+	if user.RoleID == 0 {
+		w.WriteHeader(http.StatusUnauthorized)
+		fmt.Fprint(w, "User not permitted.")
+		return
+	}
+
+	if r.Method == "GET" {
+		// Permissions: only admins or collection members can GET.
+		// TODO(rob): check perms.
+
+		var rows *sql.Rows
+		var err error
+		if user.RoleID == 1 {
+			// return everything if user is admin.
+			rows, err = db.Query(`SELECT e.id, e.name, e.desc, i.id, i.name, i.desc FROM entities e JOIN items i ON e.item_id = i.id;`)
+		} else {
+			// only return items where user is member or owner of collection.
+			rows, err = db.Query(`SELECT e.id, e.name, e.desc, i.id, i.name, i.desc FROM entities e JOIN items i ON e.item_id = i.id JOIN collections c ON i.collection_id = c.id JOIN members m ON m.user_id = ? WHERE m.scope = ? AND (m.role = ? OR m.role = ?) ;`, user.ID, SCOPE_COLLECTION, MEMBER_ROLE_MEMBER, MEMBER_ROLE_OWNER)
+		}
+		if err != nil {
+			log.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, "Database error.")
+			return
+		}
+		entities := []Entity{}
+		for rows.Next() {
+			entity := Entity{}
+			err := rows.Scan(&entity.ID, &entity.Name, &entity.Desc, &entity.Item.ID, &entity.Item.Name, &entity.Item.Desc)
+			if err != nil {
+				log.Println(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
+			// construct Files slice using entity id
+			fileRows, err := db.Query(`SELECT f.id, f.name, f.desc, f.filename, f.md5, f.size, f.ext FROM files f WHERE f.entity_id = ?;`, entity.ID)
+			if err != nil {
+				log.Println(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprint(w, "Database error.")
+				return
+			}
+			for fileRows.Next() {
+				file := File{}
+				err := fileRows.Scan(&file.ID, &file.Name, &file.Desc, &file.Filename, &file.MD5, &file.Size, &file.Ext)
+				if err != nil {
+					log.Println(err)
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				entity.Files = append(entity.Files, file)
+			}
+
+			entities = append(entities, entity)
+		}
+
+		// construct users data payload
+		entitiesJSON, err := json.Marshal(entities)
+		if err != nil {
+			log.Println("Error encoding entities data", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		fmt.Fprint(w, string(entitiesJSON))
+		return
+	}
+
+	if r.Method == "POST" {
+		// Permissions: only admins or org members can POST.
+		// TODO(rob): check perms.
+		err := r.ParseMultipartForm(10 << maxUploadSizeMB) // maxUploadSizeMB will be held in memory, the rest of the form data will go to disk.
+		if err != nil {
+			log.Println(err)
+			fmt.Fprintln(w, err)
+			return
+		}
+
+		id, _ := strconv.ParseInt(r.FormValue("id"), 10, 64)
+		name := r.FormValue("name")
+		desc := r.FormValue("desc")
+		item := r.FormValue("item")
+
+		if id != 0 {
+			// update existing org record
+			log.Println("Update entity data for:", name)
+			_, err = db.Exec(`UPDATE entities e SET e.name=?, e.desc=? e.item_id=? WHERE e.id=?;`, name, desc, item, id)
+			if err != nil {
+				log.Println(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprint(w, "Error updating entity data.")
+				return
+			}
+		} else {
+			// write new db record
+			_, err := db.Exec("INSERT INTO entities (name, `desc`, item_id) VALUES (?, ?, ?);", name, desc, item)
+			if err != nil {
+				log.Println(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprint(w, "Database error.")
+				return
+			}
+		}
+
+		fmt.Fprintf(w, "Entity data saved successfully: "+name)
+		return
+	}
+
+	if r.Method == "DELETE" {
+		// Permissions: only admins or collection owners can DELETE.
+		// TODO(rob): check perms
+		id := r.URL.Query().Get("id")
+		_, err = db.Exec(`DELETE FROM entities WHERE id = ?`, id)
+		if err != nil {
+			log.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, "Database error.")
+			return
+		}
+		fmt.Fprintf(w, "Entity deleted successfully: "+id)
+		return
+	}
+}
+
 func filesHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println(r.Method, r.RequestURI, r.RemoteAddr)
 	w.Header().Set("Access-Control-Allow-Origin", origin)
@@ -1611,7 +1729,7 @@ func filesHandler(w http.ResponseWriter, r *http.Request) {
 									o.id, o.name, o.desc
 								FROM files f
 								JOIN entities e ON e.id = f.entity_id
-								JOIN items i ON i.id = f.item_id 
+								JOIN items i ON i.id = e.item_id 
 								JOIN collections c ON i.collection_id = c.id
 								JOIN organizations o on c.org_id = o.id;`)
 		} else {
@@ -1682,7 +1800,7 @@ func filesHandler(w http.ResponseWriter, r *http.Request) {
 		col := ""
 		org := ""
 
-		// get item info
+		// get hierarchy info
 		rows, err := db.Query(`SELECT i.id, c.id, o.id 
 							   FROM entities e 
 							   JOIN items i ON e.item_id = i.id 
@@ -1736,7 +1854,7 @@ func filesHandler(w http.ResponseWriter, r *http.Request) {
 		if id != 0 {
 			// update existing org record
 			log.Println("Update file data for:", name)
-			_, err = db.Exec(`UPDATE files f SET f.name=?, f.desc=?, f.item_id=?, f.filename=?,f.md5=?, f.size=?, f.ext=? WHERE f.id=?;`, name, desc, item, filename, md5, ext, id)
+			_, err = db.Exec(`UPDATE files f SET f.name=?, f.desc=?, f.entity_id=?, f.filename=?,f.md5=?, f.size=?, f.ext=? WHERE f.id=?;`, name, desc, entity, filename, md5, ext, id)
 			if err != nil {
 				log.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
@@ -1745,7 +1863,7 @@ func filesHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		} else {
 			// write new db record
-			_, err := db.Exec("INSERT INTO files (name, `desc`, item_id, filename, md5, size, ext) VALUES (?, ?, ?, ?, ?, ?, ?);", name, desc, item, filename, md5, size, ext)
+			_, err := db.Exec("INSERT INTO files (name, `desc`, entity_id, filename, md5, size, ext) VALUES (?, ?, ?, ?, ?, ?, ?);", name, desc, entity, filename, md5, size, ext)
 			if err != nil {
 				log.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
@@ -2065,6 +2183,7 @@ func main() {
 	http.HandleFunc("/orgs", orgsHandler)
 	http.HandleFunc("/collections", collectionsHandler)
 	http.HandleFunc("/items", itemsHandler)
+	http.HandleFunc("/entities", entitiesHandler)
 	http.HandleFunc("/files", filesHandler)
 
 	// serve

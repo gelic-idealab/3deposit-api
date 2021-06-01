@@ -59,10 +59,11 @@ CREATE TABLE `items` (
 
 CREATE TABLE `entities` (
     `id` int NOT NULL AUTO_INCREMENT,
-    `name` varchar(256),
+    `name` varchar(256) NOT NULL,
     `desc` varchar(4096) NOT NULL,
-    `item_id` int DEFAULT NULL
-)
+    `item_id` int DEFAULT NULL,
+    PRIMARY KEY (`id`)
+);
 
 CREATE TABLE `files` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
