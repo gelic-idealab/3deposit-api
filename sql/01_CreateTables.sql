@@ -102,6 +102,7 @@ CREATE TABLE `metadata_fields` (
     `label` varchar(256) NOT NULL,
     `schema` varchar(64) NOT NULL,
     `tag` varchar(128) NOT NULL,
+    `scope` varchar(128) NOT NULL,
     `note` varchar (4096),
     `required` tinyint NOT NULL,
     `org_id` int DEFAULT NULL,

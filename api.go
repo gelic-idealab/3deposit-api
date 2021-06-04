@@ -148,6 +148,7 @@ type MetadataField struct {
 	Label        string        `json:"label"`
 	Schema       string        `json:"schema"`
 	Tag          string        `json:"tag"`
+	Scope        string        `json:"scope"`
 	Note         string        `json:"note"`
 	Required     bool          `json:"required"`
 	OrgID        int           `json:"org_id"`
@@ -1971,7 +1972,7 @@ func metadataHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == "GET" {
 		// get metadata fields
-		rows, err := db.Query("SELECT `id`, `label`, `schema`, `tag`, `note`, `required` FROM metadata_fields;")
+		rows, err := db.Query("SELECT `id`, `label`, `schema`, `tag`, IFNULL(`scope`, 'None'), `note`, `required` FROM metadata_fields;")
 		if err != nil {
 			log.Println(err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -1980,7 +1981,7 @@ func metadataHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		for rows.Next() {
 			field := MetadataField{}
-			err := rows.Scan(&field.ID, &field.Label, &field.Schema, &field.Tag, &field.Note, &field.Required)
+			err := rows.Scan(&field.ID, &field.Label, &field.Schema, &field.Tag, &field.Scope, &field.Note, &field.Required)
 			if err != nil {
 				log.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
@@ -2015,6 +2016,7 @@ func metadataHandler(w http.ResponseWriter, r *http.Request) {
 		label := r.FormValue("label")
 		schema := r.FormValue("schema")
 		tag := r.FormValue("tag")
+		scope := r.FormValue("scope")
 		note := r.FormValue("note")
 		req := r.FormValue("required")
 
@@ -2026,7 +2028,7 @@ func metadataHandler(w http.ResponseWriter, r *http.Request) {
 		if len(existingID) > 0 {
 			log.Println("Update metadata field data for id:", existingID)
 
-			_, err = db.Exec("UPDATE metadata_fields SET `label`=?, `schema`=?, `tag`=?, `note`=?, `required`=? WHERE id=?;", label, schema, tag, note, required, existingID)
+			_, err = db.Exec("UPDATE metadata_fields SET `label`=?, `schema`=?, `tag`=?, `scope`=?, `note`=?, `required`=? WHERE id=?;", label, schema, tag, scope, note, required, existingID)
 			if err != nil {
 				log.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
@@ -2039,7 +2041,7 @@ func metadataHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// write db record
-		_, err = db.Exec("INSERT INTO metadata_fields (`label`, `schema`, `tag`, `note`, `required`) VALUES (?, ?, ?, ?, ?);", label, schema, tag, note, required)
+		_, err = db.Exec("INSERT INTO metadata_fields (`label`, `schema`, `tag`, `scope`, `note`, `required`) VALUES (?, ?, ?, ?, ?, ?);", label, schema, tag, scope, note, required)
 		if err != nil {
 			log.Println(err)
 			w.WriteHeader(http.StatusInternalServerError)
