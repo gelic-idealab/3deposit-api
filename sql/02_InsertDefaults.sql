@@ -3,15 +3,7 @@ USE `3deposit`;
 INSERT INTO roles (`role_name`)
 VALUES ('admin'),
        ('manager'),
-       ('uploader'),
-       ('viewer');
-
-
-INSERT INTO deposit_types (`type`)
-VALUES ('model'),
-       ('video'),
-       ('vr');
-
+       ('user');
 
 INSERT INTO metadata_fields (`label`, `schema`, `tag`, `note`, `required`)
 VALUES (

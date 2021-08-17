@@ -453,6 +453,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		// no email and/or password in request
 		fmt.Fprintln(w, "Missing login information.")
+		return
 	}
 }
 
@@ -566,409 +567,6 @@ func dashboardHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// func uploadHandler(w http.ResponseWriter, r *http.Request) {
-// 	log.Println(r.Method, r.RequestURI, r.RemoteAddr)
-// 	w.Header().Set("Access-Control-Allow-Origin", origin)
-// 	w.Header().Set("Access-Control-Allow-Headers", "X-API-KEY")
-// 	w.Header().Set("Access-Control-Allow-Methods", "DELETE")
-
-// 	if r.Method == "OPTIONS" {
-// 		return
-// 	}
-
-// 	token := r.Header.Get("X-API-KEY")
-// 	user, err := userHasPermissions(token, userRoleUser)
-// 	if err != nil {
-// 		log.Println(err)
-// 		w.WriteHeader(http.StatusInternalServerError)
-// 		fmt.Fprint(w, "Database error.")
-// 	}
-// 	if user.RoleID == 0 {
-// 		w.WriteHeader(http.StatusUnauthorized)
-// 		fmt.Fprint(w, "User not permitted.")
-// 		return
-// 	}
-
-// 	if r.Method == "POST" {
-// 		err := r.ParseMultipartForm(10 << maxUploadSizeMB) // maxUploadSizeMB will be held in memory, the rest of the form data will go to disk.
-// 		if err != nil {
-// 			fmt.Fprintln(w, err)
-// 			return
-// 		}
-
-// 		// Unpack and store form data
-// 		formdata := r.MultipartForm
-// 		files := formdata.File["file"]
-
-// 		depositID := uuid.New().String()
-// 		depositName := r.FormValue("deposit_name")
-// 		depositDesc := r.FormValue("deposit_desc")
-// 		dt := r.FormValue("deposit_type")
-// 		depositType := 0
-// 		switch dt {
-// 		case "model":
-// 			depositType = 1
-// 		case "video":
-// 			depositType = 2
-// 		case "vr":
-// 			depositType = 3
-// 		}
-
-// 		var depositSize int64
-// 		for i := range files {
-// 			filename := files[i].Filename
-// 			log.Println("Processing file:", filename)
-
-// 			size := files[i].Size
-// 			depositSize += size
-
-// 			file, err := files[i].Open()
-// 			if err != nil {
-// 				fmt.Fprintln(w, err)
-// 				return
-// 			}
-// 			defer file.Close()
-
-// 			// put object into default bucket
-// 			info, err := minioClient.PutObject(context.Background(), defaultBucketName, depositID+"/"+filename, file, size, minio.PutObjectOptions{})
-// 			if err != nil {
-// 				log.Println(err)
-// 				w.WriteHeader(http.StatusInternalServerError)
-// 				fmt.Fprint(w, "Storage error.")
-// 				return
-// 			}
-// 			log.Println("Successfully put object:", info)
-
-// 			// genereate boilerplate metadata xml file
-// 			// see: https://golang.org/src/encoding/xml/example_test.go
-// 			// cmd := exec.Command("python", "./premis/generate.py", "fileID", filename)
-// 			// cmd.Stdout = os.Stdout
-// 			// cmd.Stderr = os.Stderr
-// 			// log.Println(cmd.Run())
-// 		}
-
-// 		// write deposit record
-// 		_, err = db.Exec(
-// 			`INSERT INTO deposits VALUES (?, ?, ?, ?, ?, ?, ?);`,
-// 			depositID, depositName, depositDesc, time.Now(), depositType, depositSize, user.ID)
-// 		if err != nil {
-// 			log.Println(err)
-// 			w.WriteHeader(http.StatusInternalServerError)
-// 			fmt.Fprint(w, "Database error.")
-// 			return
-// 		}
-
-// 		for field := range formdata.Value {
-// 			if field != "deposit_name" && field != "deposit_desc" && field != "deposit_type" {
-// 				mf := MetadataField{}
-// 				json.Unmarshal([]byte(r.FormValue(field)), &mf)
-
-// 				// write metadata records
-// 				_, err = db.Exec(
-// 					`INSERT INTO metadata_values (deposit_id, metadata_id, value, updated, updated_by) VALUES (?, ?, ?, ?, ?);`,
-// 					depositID, mf.ID, mf.Value.Value, time.Now(), user.ID)
-// 				if err != nil {
-// 					log.Println(err)
-// 					w.WriteHeader(http.StatusInternalServerError)
-// 					fmt.Fprint(w, "Database error.")
-// 					return
-// 				}
-
-// 				// write event record
-// 				_, err = db.Exec(
-// 					`INSERT INTO events
-// 						(user_id, deposit_id, event_scope, event_target, event_type, event_timestamp)
-// 					VALUES (?, ?, ?, ?, ?, ?);`,
-// 					user.ID, depositID, "metadata", mf.ID, "create", time.Now())
-// 				if err != nil {
-// 					log.Println(err)
-// 					w.WriteHeader(http.StatusInternalServerError)
-// 					fmt.Fprint(w, "Database error.")
-// 					return
-// 				}
-// 			}
-// 		}
-
-// 		// genereate boilerplate metadata xml file
-// 		// see: https://golang.org/src/encoding/xml/example_test.go
-// 		// cmd := exec.Command("python", "./premis/generate.py", "depositID", depositID)
-// 		// cmd.Stdout = os.Stdout
-// 		// cmd.Stderr = os.Stderr
-// 		// log.Println(cmd.Run())
-
-// 		fmt.Fprintf(w, "Deposit uploaded successfully: "+depositName)
-// 		return
-// 	}
-
-// 	// unhandled method
-// 	fmt.Fprintln(w, "No handler for method:", r.Method)
-
-// }
-
-// DEPRECATED
-// func depositsHandler(w http.ResponseWriter, r *http.Request) {
-// 	log.Println(r.Method, r.RequestURI, r.RemoteAddr)
-// 	w.Header().Set("Access-Control-Allow-Origin", origin)
-// 	w.Header().Set("Access-Control-Allow-Headers", "X-API-KEY")
-// 	w.Header().Set("Access-Control-Allow-Methods", "DELETE")
-
-// 	if r.Method == "OPTIONS" {
-// 		return
-// 	}
-
-// 	token := r.Header.Get("X-API-KEY")
-// 	user, err := userHasPermissions(token, userRoleUser)
-// 	if err != nil {
-// 		log.Println(err)
-// 		w.WriteHeader(http.StatusInternalServerError)
-// 		fmt.Fprint(w, "Database error.")
-// 	}
-// 	if user.RoleID == 0 {
-// 		w.WriteHeader(http.StatusUnauthorized)
-// 		fmt.Fprint(w, "User not permitted.")
-// 		return
-// 	}
-
-// 	// if r.Method == "POST" {
-// 	// 	err := r.ParseMultipartForm(10 << maxUploadSizeMB) // maxUploadSizeMB will be held in memory, the rest of the form data will go to disk.
-// 	// 	if err != nil {
-// 	// 		log.Println(err)
-// 	// 		fmt.Fprintln(w, err)
-// 	// 		return
-// 	// 	}
-
-// 	// 	formdata := r.MultipartForm
-// 	// 	fmt.Println(formdata)
-// 	//  }
-
-// 	if r.Method == "GET" {
-// 		// get specific deposit data if id query
-// 		depositID := r.URL.Query().Get("id")
-// 		if len(depositID) > 0 {
-// 			rows, err := db.Query(
-// 				`SELECT
-// 					d.id,
-// 					d.name,
-// 					d.desc,
-// 					d.updated,
-// 					dt.type,
-// 					d.size,
-// 					u.id,
-// 					u.email,
-// 					u.first_name,
-// 					u.last_name
-// 				FROM deposits d
-// 				JOIN deposit_types dt on d.type_id = dt.id
-// 				JOIN users u on u.id = d.upload_by
-// 				WHERE d.id = ?;`,
-// 				depositID)
-// 			if err != nil {
-// 				log.Println(err)
-// 				w.WriteHeader(http.StatusInternalServerError)
-// 				fmt.Fprint(w, "Database error.")
-// 				return
-// 			}
-// 			deposit := Deposit{}
-// 			for rows.Next() {
-// 				err := rows.Scan(
-// 					&deposit.ID,
-// 					&deposit.Name,
-// 					&deposit.Desc,
-// 					&deposit.Updated,
-// 					&deposit.Type,
-// 					&deposit.Size,
-// 					&deposit.Creator.ID,
-// 					&deposit.Creator.Email,
-// 					&deposit.Creator.First,
-// 					&deposit.Creator.Last,
-// 				)
-// 				if err != nil {
-// 					log.Println(err)
-// 					w.WriteHeader(http.StatusInternalServerError)
-// 					return
-// 				}
-// 			}
-
-// 			// Get deposit events
-// 			rows, err = db.Query(
-// 				`SELECT
-// 					id,
-// 					user_id,
-// 					deposit_id,
-// 					event_scope,
-// 					event_target,
-// 					event_type,
-// 					event_timestamp
-// 				FROM events
-// 				WHERE deposit_id = ?`,
-// 				deposit.ID,
-// 			)
-// 			if err != nil {
-// 				log.Println(err)
-// 				w.WriteHeader(http.StatusInternalServerError)
-// 				fmt.Fprint(w, "Database error.")
-// 				return
-// 			}
-// 			events := []DepositEvent{}
-// 			for rows.Next() {
-// 				de := DepositEvent{}
-// 				err := rows.Scan(
-// 					&de.ID,
-// 					&de.User,
-// 					&de.DepositID,
-// 					&de.Scope,
-// 					&de.Target,
-// 					&de.Type,
-// 					&de.Time,
-// 				)
-// 				if err != nil {
-// 					log.Println(err)
-// 					w.WriteHeader(http.StatusInternalServerError)
-// 					return
-// 				}
-// 				events = append(events, de)
-// 			}
-
-// 			deposit.Events = events
-
-// 			// Get deposit metadata values
-// 			// Query selects all required fields, or any fields that have metadata values
-// 			rows, err = db.Query(
-// 				`SELECT
-// 					f.id,
-// 					f.label,
-// 					f.schema,
-// 					f.tag,
-// 					f.note,
-// 					f.required,
-// 					IFNULL(v.id, 0),
-// 					IFNULL(v.deposit_id, 0),
-// 					IFNULL(v.metadata_id, 0),
-// 					IFNULL(v.value, ""),
-// 					IFNULL(v.updated, 0),
-// 					IFNULL(v.updated_by, 0)
-// 				FROM metadata_fields f
-// 				LEFT JOIN metadata_values v
-// 				ON (v.metadata_id = f.id AND v.deposit_id = ?)
-// 				WHERE (f.required = 1 OR v.value IS NOT NULL);`,
-// 				deposit.ID,
-// 			)
-// 			if err != nil {
-// 				log.Println(err)
-// 				w.WriteHeader(http.StatusInternalServerError)
-// 				fmt.Fprint(w, "Database error.")
-// 				return
-// 			}
-// 			metadata := []MetadataField{}
-// 			for rows.Next() {
-// 				val := MetadataField{}
-// 				err := rows.Scan(
-// 					&val.ID,
-// 					&val.Label,
-// 					&val.Schema,
-// 					&val.Tag,
-// 					&val.Note,
-// 					&val.Required,
-// 					&val.Value.ID,
-// 					&val.Value.DepositID,
-// 					&val.Value.MetadataID,
-// 					&val.Value.Value,
-// 					&val.Value.Updated,
-// 					&val.Value.UpdatedBy,
-// 				)
-// 				if err != nil {
-// 					log.Println(err)
-// 					w.WriteHeader(http.StatusInternalServerError)
-// 					return
-// 				}
-// 				metadata = append(metadata, val)
-// 			}
-
-// 			deposit.Metadata = metadata
-
-// 			// construct deposit file tree
-// 			for object := range minioClient.ListObjects(context.Background(), defaultBucketName, minio.ListObjectsOptions{Prefix: depositID, Recursive: true}) {
-// 				item := DepositItem{}
-// 				splits := strings.Split(object.Key, "/")
-// 				item.Name = strings.Join(splits[1:], "/")
-// 				splits = strings.Split(object.Key, ".")
-// 				item.Ext = splits[len(splits)-1]
-// 				item.Size = object.Size
-// 				item.Updated = object.LastModified.String()
-// 				deposit.Items = append(deposit.Items, item)
-// 			}
-
-// 			// construct deposits data payload
-// 			depositJSON, err := json.Marshal(deposit)
-// 			if err != nil {
-// 				log.Println("Error encoding deposit data", err)
-// 				w.WriteHeader(http.StatusInternalServerError)
-// 				return
-// 			}
-// 			fmt.Fprint(w, string(depositJSON))
-// 			return
-// 		}
-
-// 		// else get all deposits data
-// 		rows, err := db.Query(
-// 			`SELECT
-// 				d.id,
-// 				d.name,
-// 				d.desc,
-// 				d.updated,
-// 				dt.type,
-// 				d.size,
-// 				u.id,
-// 				u.email,
-// 				u.first_name,
-// 				u.last_name
-// 			FROM deposits d
-// 			JOIN deposit_types dt on d.type_id = dt.id
-// 			JOIN users u on u.id = d.upload_by;`,
-// 		)
-// 		if err != nil {
-// 			log.Println(err)
-// 			w.WriteHeader(http.StatusInternalServerError)
-// 			fmt.Fprint(w, "Database error.")
-// 			return
-// 		}
-// 		deposits := []Deposit{}
-// 		for rows.Next() {
-// 			deposit := Deposit{}
-// 			err := rows.Scan(
-// 				&deposit.ID,
-// 				&deposit.Name,
-// 				&deposit.Desc,
-// 				&deposit.Updated,
-// 				&deposit.Type,
-// 				&deposit.Size,
-// 				&deposit.Creator.ID,
-// 				&deposit.Creator.Email,
-// 				&deposit.Creator.First,
-// 				&deposit.Creator.Last,
-// 			)
-// 			if err != nil {
-// 				log.Println(err)
-// 				w.WriteHeader(http.StatusInternalServerError)
-// 				return
-// 			}
-// 			deposits = append(deposits, deposit)
-// 		}
-// 		// construct deposits data payload
-// 		depositsJSON, err := json.Marshal(deposits)
-// 		if err != nil {
-// 			log.Println("Error encoding deposits data", err)
-// 			w.WriteHeader(http.StatusInternalServerError)
-// 			return
-// 		}
-// 		fmt.Fprint(w, string(depositsJSON))
-// 		return
-// 	}
-
-// 	// unhandled method
-// 	fmt.Fprintln(w, "No handler for method:", r.Method)
-// }
-
 func downloadHandler(w http.ResponseWriter, r *http.Request) {
 
 	// TODO(rob): use new object path format from filesHandler POST
@@ -1066,6 +664,7 @@ func usersHandler(w http.ResponseWriter, r *http.Request) {
 		firstName := r.FormValue("firstName")
 		lastName := r.FormValue("lastName")
 		role := r.FormValue("role")
+		org := r.FormValue("org")
 
 		hashed := getHashedPassword(password)
 
@@ -1090,7 +689,7 @@ func usersHandler(w http.ResponseWriter, r *http.Request) {
 			log.Println("Update user data for id:", existingID)
 
 			// update existing user data
-			if len(password) > 0 {
+			if len(password) > 0 { // new password is being set.
 				_, err = db.Exec(`UPDATE users SET email=?, password=?, role_id=?, first_name=?, last_name=? WHERE id=?;`, email, hashed, roleID, firstName, lastName, existingID)
 				if err != nil {
 					log.Println(err)
@@ -1108,16 +707,42 @@ func usersHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
+			// update org membership
+			_, err = db.Exec(`UPDATE members SET role = ? WHERE user_id=? AND ref_id=?;`, MEMBER_ROLE_MEMBER, existingID, org)
+			if err != nil {
+				log.Println(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprint(w, "Error updating user org membership.")
+				return
+			}
+
 			fmt.Fprintf(w, "User data saved successfully: "+email)
 			return
 		}
 
 		// write db record
-		_, err = db.Exec(`INSERT INTO users (email, password, role_id, first_name, last_name) VALUES (?, ?, ?, ?, ?);`, email, hashed, roleID, firstName, lastName)
+		result, err := db.Exec(`INSERT INTO users (email, password, role_id, first_name, last_name) VALUES (?, ?, ?, ?, ?);`, email, hashed, roleID, firstName, lastName)
 		if err != nil {
 			log.Println(err)
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprint(w, "Database error.")
+			return
+		}
+
+		userId, err := result.LastInsertId()
+		if err != nil {
+			log.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, "Database error.")
+			return
+		}
+
+		// set org membership
+		_, err = db.Exec(`INSERT INTO members (role, user_id, ref_id);`, MEMBER_ROLE_MEMBER, userId, org)
+		if err != nil {
+			log.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, "Error updating user org membership.")
 			return
 		}
 		fmt.Fprintf(w, "User added successfully: "+email)
@@ -1805,7 +1430,7 @@ func filesHandler(w http.ResponseWriter, r *http.Request) {
 									JOIN collections c ON i.collection_id = c.id
 									JOIN organization o ON c.org_id = o.id
 									JOIN members m ON m.user_id = ? 
-									WHERE m.scope = ? AND (m.role = ? OR m.role = ?) ;`, user.ID, SCOPE_COLLECTION, MEMBER_ROLE_MEMBER, MEMBER_ROLE_OWNER)
+									WHERE m.scope = ? AND (m.role = ? OR m.role = ?) ;`, user.ID, SCOPE_ORG, MEMBER_ROLE_MEMBER, MEMBER_ROLE_OWNER)
 		}
 		if err != nil {
 			log.Println(err)
@@ -1972,7 +1597,7 @@ func metadataHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	token := r.Header.Get("X-API-KEY")
-	user, err := userHasPermissions(token, userRoleAdmin)
+	user, err := userHasPermissions(token, userRoleUser)
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
