@@ -1,18 +1,18 @@
 USE `3deposit`;
 
 CREATE TABLE `roles` (
-    `id`  tinyint NOT NULL AUTO_INCREMENT,
+    `id`  tinyint AUTO_INCREMENT,
     `role_name` varchar(20),
     PRIMARY KEY (id)
 );
 
 CREATE TABLE `users` (
-    `id`  int NOT NULL AUTO_INCREMENT,
-    `email` varchar(50) NOT NULL,
-    `password`  varchar(50) NOT NULL,
-    `first_name` varchar(20) NOT NULL,
-    `last_name` varchar(20) NOT NULL,
-    `role_id`  tinyint NOT NULL,
+    `id`  int AUTO_INCREMENT,
+    `email` varchar(50),
+    `password`  varchar(50),
+    `first_name` varchar(20),
+    `last_name` varchar(20),
+    `role_id`  tinyint,
     `last_login_at` timestamp,
     UNIQUE (id, email),
     PRIMARY KEY (id),
@@ -20,7 +20,7 @@ CREATE TABLE `users` (
 );
 
 CREATE TABLE `members` (
-  `id` INT NOT NULL AUTO_INCREMENT,
+  `id` INT AUTO_INCREMENT,
   `user_id` INT NULL,
   `ref_id` INT NULL,
   `scope` varchar(20) NULL,
@@ -29,46 +29,46 @@ CREATE TABLE `members` (
 
 
 CREATE TABLE `deposit_types` (
-    `id` int NOT NULL AUTO_INCREMENT,
-    `type` varchar(20) NOT NULL,
+    `id` int AUTO_INCREMENT,
+    `type` varchar(20),
     PRIMARY KEY (id)
 );
 
 CREATE TABLE `organizations` (
-    `id` int NOT NULL AUTO_INCREMENT,
-    `name` varchar(256) NOT NULL,
-    `desc` varchar(4096) NOT NULL,
+    `id` int AUTO_INCREMENT,
+    `name` varchar(256),
+    `desc` varchar(4096),
     PRIMARY KEY (id)
 );
 
 CREATE TABLE `collections` (
-    `id` int NOT NULL AUTO_INCREMENT,
-    `name` varchar(256) NOT NULL,
-    `desc` varchar(4096) NOT NULL,
+    `id` int AUTO_INCREMENT,
+    `name` varchar(256),
+    `desc` varchar(4096),
     `org_id` int DEFAULT NULL,
     PRIMARY KEY (id)
 );
 
 CREATE TABLE `items` (
-    `id` int NOT NULL AUTO_INCREMENT,
-    `name` varchar(256) NOT NULL,
-    `desc` varchar(4096) NOT NULL,
+    `id` int AUTO_INCREMENT,
+    `name` varchar(256),
+    `desc` varchar(4096),
     `collection_id` int DEFAULT NULL,
     PRIMARY KEY (id)
 );
 
 CREATE TABLE `entities` (
-    `id` int NOT NULL AUTO_INCREMENT,
-    `name` varchar(256) NOT NULL,
-    `desc` varchar(4096) NOT NULL,
+    `id` int AUTO_INCREMENT,
+    `name` varchar(256),
+    `desc` varchar(4096),
     `item_id` int DEFAULT NULL,
     PRIMARY KEY (`id`)
 );
 
 CREATE TABLE `files` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `name` varchar(256) NOT NULL,
-  `desc` varchar(4096) NOT NULL,
+  `id` int(11) AUTO_INCREMENT,
+  `name` varchar(256),
+  `desc` varchar(4096),
   `entity_id` int(11) DEFAULT NULL,
   `filename` varchar(45) DEFAULT NULL,
   `md5` varchar(45) DEFAULT NULL,
@@ -78,42 +78,42 @@ CREATE TABLE `files` (
 );
 
 CREATE TABLE `tokens` (
-    `id` int NOT NULL AUTO_INCREMENT,
-    `token` varchar(128) NOT NULL,
-    `user_id` int NOT NULL,
+    `id` int AUTO_INCREMENT,
+    `token` varchar(128),
+    `user_id` int,
     `expires` timestamp,
     PRIMARY KEY (id),
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
 CREATE TABLE `events` (
-    `id` int NOT NULL AUTO_INCREMENT,
-    `user_id` int NOT NULL,
-    `deposit_id` varchar(50) NOT NULL,
-    `event_scope` varchar(50) NOT NULL,
-    `event_target` int NOT NULL,
-    `event_type` varchar(128) NOT NULL,
-    `event_timestamp` timestamp NOT NULL,
+    `id` int AUTO_INCREMENT,
+    `user_id` int,
+    `deposit_id` varchar(50),
+    `event_scope` varchar(50),
+    `event_target` int,
+    `event_type` varchar(128),
+    `event_timestamp` timestamp,
     PRIMARY KEY (id)
 );
 
 CREATE TABLE `metadata_fields` (
-    `id` int NOT NULL AUTO_INCREMENT,
-    `label` varchar(256) NOT NULL,
-    `schema` varchar(64) NOT NULL,
-    `tag` varchar(128) NOT NULL,
-    `scope` varchar(128) NOT NULL,
+    `id` int AUTO_INCREMENT,
+    `label` varchar(256),
+    `schema` varchar(64),
+    `tag` varchar(128),
+    `scope` varchar(128),
     `note` varchar (4096),
-    `required` tinyint NOT NULL,
+    `required` tinyint,
     `org_id` int DEFAULT NULL,
     `collection_id` int DEFAULT NULL,
     PRIMARY KEY (id)
 );
 
 CREATE TABLE `metadata_values` (
-    `id` int NOT NULL AUTO_INCREMENT,
+    `id` int AUTO_INCREMENT,
     `file_id` varchar(50),
-    `metadata_id` int NOT NULL,
+    `metadata_id` int,
     `value` varchar(4096),
     `updated` timestamp,
     `updated_by` int,
@@ -121,8 +121,8 @@ CREATE TABLE `metadata_values` (
 );
 
 CREATE TABLE `metadata_vocab` (
-    `id` int NOT NULL AUTO_INCREMENT,
-    `field_id` int NOT NULL,
+    `id` int AUTO_INCREMENT,
+    `field_id` int,
     `vocab_item` varchar(256),
     PRIMARY KEY (id)
 );
