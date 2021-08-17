@@ -72,11 +72,11 @@ type User struct {
 
 // Dashboard data with counts by type
 type Dashboard struct {
-	Size   int64 `json:"size"`
-	Total  int   `json:"total"`
-	Models int   `json:"models"`
-	Videos int   `json:"videos"`
-	VR     int   `json:"vr"`
+	Size        int64 `json:"size"`
+	Collections int   `json:"collections"`
+	Items       int   `json:"items"`
+	Entities    int   `json:"entities"`
+	Files       int   `json:"files"`
 }
 
 // Top-level grouping for all collections, items, entities, and files
@@ -463,8 +463,8 @@ func dashboardHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		dashboard := Dashboard{}
 
-		// get model count
-		rows, err := db.Query(`SELECT count(*) from deposits WHERE type_id = ?`, 1)
+		// get collection count
+		rows, err := db.Query(`SELECT count(*) from collections;`)
 		if err != nil {
 			log.Println(err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -473,7 +473,7 @@ func dashboardHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		for rows.Next() {
-			err := rows.Scan(&dashboard.Models)
+			err := rows.Scan(&dashboard.Collections)
 			if err != nil {
 				log.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
@@ -481,8 +481,8 @@ func dashboardHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// get video count
-		rows, err = db.Query(`SELECT count(*) from deposits WHERE type_id = ?`, 2)
+		// get item count
+		rows, err = db.Query(`SELECT count(*) from items;`)
 		if err != nil {
 			log.Println(err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -491,7 +491,7 @@ func dashboardHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		for rows.Next() {
-			err := rows.Scan(&dashboard.Videos)
+			err := rows.Scan(&dashboard.Items)
 			if err != nil {
 				log.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
@@ -499,8 +499,8 @@ func dashboardHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// get vr count
-		rows, err = db.Query(`SELECT count(*) from deposits WHERE type_id = ?`, 3)
+		// get entity count
+		rows, err = db.Query(`SELECT count(*) from entities;`)
 		if err != nil {
 			log.Println(err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -509,7 +509,7 @@ func dashboardHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		for rows.Next() {
-			err := rows.Scan(&dashboard.VR)
+			err := rows.Scan(&dashboard.Entities)
 			if err != nil {
 				log.Println(err)
 				w.WriteHeader(http.StatusInternalServerError)
@@ -517,10 +517,26 @@ func dashboardHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		dashboard.Total = dashboard.Models + dashboard.Videos + dashboard.VR
+		// get file count
+		rows, err = db.Query(`SELECT count(*) from files;`)
+		if err != nil {
+			log.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, "Database error.")
+			return
+		}
+
+		for rows.Next() {
+			err := rows.Scan(&dashboard.Files)
+			if err != nil {
+				log.Println(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+		}
 
 		// get total size of deposits
-		rows, err = db.Query(`SELECT IFNULL(SUM(size), 0) FROM deposits WHERE size IS NOT NULL;`)
+		rows, err = db.Query(`SELECT IFNULL(SUM(size), 0) FROM files WHERE size IS NOT NULL;`)
 		if err != nil {
 			log.Println(err)
 			w.WriteHeader(http.StatusInternalServerError)
